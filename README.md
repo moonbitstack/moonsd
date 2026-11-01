@@ -34,6 +34,13 @@ A watcher gives whole snapshots, not events. A backend that lost its connection 
 | `moonsd/memory` | `Registry`, the contract in this process: leases when given a clock, revisions, `snapshot` and `restore` |
 | `moonsd/conformance` | `check`, every behaviour the contract promises, run against any backend |
 
+## Backends
+
+| Package | Backend |
+|:--:|:--|
+| `moonredis/sd` | Expiring keys, watched by reading again |
+| `moonetcd/sd` | Keys on leases, watched by revision |
+
 ## Writing a backend
 
 Implement `Registrar` and `Discovery`, and call `check` from your tests against a real server:
