@@ -1,6 +1,17 @@
-// Everything this repository does, in one run: `moon run src/examples/tour`.
+// Everything this repository does, in one run: `moon run src/examples/tour --target native`.
 pkgtype(kind: "executable")
 
 import {
   "moonbitstack/moonsd",
+  "moonbitstack/moonsd/memory",
+  "moonbitlang/async",
 }
+
+warnings = "-29"
+
+options(
+  targets: {
+    "main.mbt": [ "native", "wasm" ],
+    "elsewhere.mbt": [ "js", "wasm-gc" ],
+  },
+)

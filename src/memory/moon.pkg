@@ -1,0 +1,14 @@
+// The contract implemented in this process, with leases, revisions and snapshots.
+import {
+  "moonbitstack/moonsd",
+  "moonbitlang/async/aqueue",
+  "moonbitlang/core/json",
+}
+
+import {
+  "moonbitstack/moonsd/memory",
+  "moonbitstack/moonsd",
+  "moonbitstack/moonsd/conformance",
+  "moonbitlang/async",
+  "moonbitlang/core/env",
+} for "test"

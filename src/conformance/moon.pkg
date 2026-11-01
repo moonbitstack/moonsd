@@ -1,0 +1,6 @@
+// One set of behaviours every backend is held to. A backend's own test suite calls `check`
+// against a real server.
+import {
+  "moonbitstack/moonsd",
+  "moonbitlang/async",
+}

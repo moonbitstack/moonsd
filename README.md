@@ -1,59 +1,52 @@
 # moonsd
 
-Service discovery for MoonBit: the contract backends implement, with one in-memory registry and a conformance suite.
+The contract of service discovery for MoonBit: what a registry does, and nothing about any one registry. A backend implements three small traits and gets the rest; a framework depends on the traits and works with every backend.
 
 ```moonbit
-@moonsd.greet("moonbit")
+// A service keeps itself registered for as long as this task runs, and leaves on the way out.
+group.spawn_bg(() => @moonsd.hold(registry, "greeter", @moonsd.Endpoint::new("10.0.0.1", 12000)))
+
+// A caller follows the service in one task, and reads the list on the request path without waiting.
+let view = @moonsd.View::new()
+group.spawn_bg(() => view.follow(registry, "greeter"))
+view.endpoints()
 ```
 
-Run `moon run src/examples/tour` for the whole surface in one go.
+Run `moon run src/examples/tour --target native` for the whole surface in one go.
 
-## Starting from this template
+## The contract
 
-1. `gh repo create moonbitstack/<name> --template moonbitstack/moonkit --public`
-2. Replace `moonsd` everywhere: `moon.mod` (name and repository), the
-   `moon.pkg` files and sources that import the library, and this file's title.
-3. The library is the root package in `src/`, so users write `@<name>.f`. Split it
-   into subpackages named after what they do (`base64/`, `sha2/`, `jwt/`) only
-   where a user would want one without the rest. Delete `src/cmd/` if the
-   repository ships no binary.
-4. Fill in `keywords` and `description` in `moon.mod`. The description is what
-   mooncakes shows, so it says what the package is and what it is not.
-5. Write the specification link into every `moon.pkg`.
+| Trait | Methods | What it promises |
+|:--:|:--|:--|
+| `Registrar` | `register`, `renew`, `deregister` | An endpoint is known for `ttl` milliseconds from its last renewal. `renew` raises `Expired` once the backend has let it go; `deregister` is harmless on a lease already gone. |
+| `Discovery` | `resolve`, `watch` | `resolve` answers once, and an unknown service has no endpoints. |
+| `Watcher` | `next`, `close` | The first `next` gives the service as it stands; each later one waits for a change. |
 
-## What is here and what is not
+A watcher gives whole snapshots, not events. A backend that lost its connection reconnects, one whose history was compacted starts again, and neither is the caller's business: what comes out is always what is true now.
 
-| Carried | Why |
-|:--|:--|
-| `.github/workflows/` | GitHub does not inherit workflows; every repository needs its own copy |
-| `moon.mod`, `src/`, `src/cmd/main/`, `src/examples/tour/` | Sources under `src/` so the root holds only entry points; the library is the root package, the binary and the examples sit beside it |
-| `.gitignore`, `.moonignore` | The second one exists because `.gitignore`'s `!.git*` would otherwise pull the whole object database into a published tarball |
-| `LICENSE` | Apache-2.0, the same across the organisation |
+`hold` and `View` are written once, against the traits. `hold` renews at a third of `ttl`, and rides out a backend that goes away: the failure goes to `report`, and the endpoint registers again when the backend is back. `View::follow` keeps the last list when a watcher fails, since a stale list beats none, and watches again after `retry` milliseconds.
 
-**Issue and pull-request templates are not here.** The organisation's `.github`
-repository supplies them to every repository that has none of its own; a copy
-here would shadow that one and then drift from it. A repository adds its own
-only when it needs something the organisation's does not cover.
+## Packages
 
-## The gate
+| Package | Contents |
+|:--:|:--|
+| `moonsd` | `Endpoint`, `Lease`, `Update`, `Refused`, the three traits, `hold`, `View` |
+| `moonsd/memory` | `Registry`, the contract in this process: leases when given a clock, revisions, `snapshot` and `restore` |
+| `moonsd/conformance` | `check`, every behaviour the contract promises, run against any backend |
 
-Every commit passes this, with each exit code seen to be zero:
+## Writing a backend
 
-```bash
-moon clean && moon fmt && moon check --target all --deny-warn \
-  && moon build --target all && moon test --target all
+Implement `Registrar` and `Discovery`, and call `check` from your tests against a real server:
+
+```moonbit
+async test "my backend keeps the contract" {
+  let backend = connect()
+  @conformance.check(backend, backend)
+}
 ```
 
-Before a release, `moon info --target all && git diff --exit-code` as well: the
-generated interface is checked in, and a difference means the interface moved
-without anyone saying so.
+`check` asks only that a change shows up within `settle` milliseconds, so an eventually consistent backend passes. Pass `expiry=false` for a backend whose leases do not end.
 
-## Releasing
-
-Push a signed tag `v<version>`. `release.yml` runs the tests first and publishes
-only if they pass and the organisation variable `MOONCAKES_PUBLISH` is `true`.
-The major version stays at 0.
-
-## Licence
+## License
 
 Apache-2.0.

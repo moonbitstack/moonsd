@@ -1,2 +1,16 @@
-// What this package implements, and a first-hand link to the specification it
-// implements. A package without that link is not finished.
+// The contract of service discovery: what a registry does, in the shape of Kratos's `Registrar`,
+// `Discovery` and `Watcher` (https://github.com/go-kratos/kratos/tree/main/registry), under
+// go-zero's word for an instance (https://github.com/zeromicro/go-zero/tree/master/core/discov).
+//
+// No backend lives here. Each lives in its own client library, as moondb's drivers do.
+import {
+  "moonbitlang/async",
+  "moonbitlang/core/string",
+  "moonbitlang/core/json",
+}
+
+import {
+  "moonbitstack/moonsd",
+  "moonbitlang/async",
+  "moonbitlang/core/json",
+} for "test"

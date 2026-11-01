@@ -12,4 +12,8 @@ keywords = [ "discovery", "registry", "moonbit" ]
 
 description = "Service discovery for MoonBit: the contract backends implement, with one in-memory registry and a conformance suite."
 
+import {
+  "moonbitlang/async@0.22.5",
+}
+
 source = "src"

@@ -1,0 +1,19 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "moonbitstack/moonsd/conformance"
+
+import {
+  "moonbitstack/moonsd",
+}
+
+// Values
+pub async fn check(&@moonsd.Registrar, &@moonsd.Discovery, service? : String, settle? : Int32, expiry? : Bool) -> Unit
+
+pub let settle : Int32
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
