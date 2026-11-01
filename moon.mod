@@ -1,15 +1,15 @@
-name = "moonbitstack/CHANGE-ME"
+name = "moonbitstack/moonsd"
 
 version = "0.1.0"
 
 readme = "README.md"
 
-repository = "https://github.com/moonbitstack/CHANGE-ME"
+repository = "https://github.com/moonbitstack/moonsd"
 
 license = "Apache-2.0"
 
-keywords = [ "moonbit" ]
+keywords = [ "discovery", "registry", "moonbit" ]
 
-description = "One sentence saying what this is and what it is not."
+description = "Service discovery for MoonBit: the contract backends implement, with one in-memory registry and a conformance suite."
 
 source = "src"
