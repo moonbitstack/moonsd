@@ -16,10 +16,11 @@ pub let ttl : Int32
 pub let weight : Int32
 
 // Errors
+#derive(Eq, @debug.Debug)
 pub(all) suberror Refused {
   Malformed(String)
   Expired(Lease)
-} derive(Eq, @debug.Debug)
+}
 pub fn Refused::equal(Self, Self) -> Bool
 pub fn Refused::not_equal(Self, Self) -> Bool
 pub fn Refused::output(Self, &Logger) -> Unit
@@ -28,40 +29,43 @@ pub fn Refused::to_string(Self) -> String
 pub impl Show for Refused
 
 // Types and methods
+#derive(Eq, @debug.Debug, @json.FromJson, @json.ToJson)
 pub(all) struct Endpoint {
   id : String
   host : String
   port : Int32
   weight : Int32
   metadata : Map[String, String]
-} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+}
 pub fn Endpoint::address(Self) -> String
 pub fn Endpoint::equal(Self, Self) -> Bool
-pub fn Endpoint::from_json(Json, @json.JsonPath) -> Self raise @json.JsonDecodeError
+pub fn Endpoint::from_json(@json.Json, @json.JsonPath) -> Self raise @json.JsonDecodeError
 pub fn Endpoint::new(String, Int32, id? : String, weight? : Int32, metadata? : Map[String, String]) -> Self
 pub fn Endpoint::not_equal(Self, Self) -> Bool
 pub fn Endpoint::parse(StringView) -> Self raise Refused
-pub fn Endpoint::to_json(Self) -> Json
+pub fn Endpoint::to_json(Self) -> @json.Json
 pub fn Endpoint::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug)
 pub(all) struct Lease {
   service : String
   endpoint : Endpoint
   ttl : Int32
   token : String
-} derive(Eq, @debug.Debug)
+}
 pub fn Lease::equal(Self, Self) -> Bool
 pub fn Lease::not_equal(Self, Self) -> Bool
 pub fn Lease::to_repr(Self) -> @debug.Repr
 
+#derive(Eq, @debug.Debug, @json.FromJson, @json.ToJson)
 pub(all) struct Update {
   endpoints : Array[Endpoint]
   revision : Int64
-} derive(Eq, ToJson, @debug.Debug, @json.FromJson)
+}
 pub fn Update::equal(Self, Self) -> Bool
-pub fn Update::from_json(Json, @json.JsonPath) -> Self raise @json.JsonDecodeError
+pub fn Update::from_json(@json.Json, @json.JsonPath) -> Self raise @json.JsonDecodeError
 pub fn Update::not_equal(Self, Self) -> Bool
-pub fn Update::to_json(Self) -> Json
+pub fn Update::to_json(Self) -> @json.Json
 pub fn Update::to_repr(Self) -> @debug.Repr
 
 pub struct View {

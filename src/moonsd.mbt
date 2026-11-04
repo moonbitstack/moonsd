@@ -13,10 +13,11 @@ pub let ttl : Int32 = 10000
 ///|
 /// Why a value was refused. `Malformed` is text that is not an endpoint or a snapshot;
 /// `Expired` is a lease its backend no longer holds, which `hold` answers by registering again.
+#derive(Eq, Debug)
 pub(all) suberror Refused {
   Malformed(String)
   Expired(Lease)
-} derive(Eq, Debug)
+}
 
 ///|
 pub impl Show for Refused with fn output(self, logger) {
@@ -42,13 +43,14 @@ pub extend Refused with Debug::{to_repr}
 /// One instance of a service. `id` tells it from the other instances of that service, and is
 /// the address unless given. `weight` and `metadata` are carried for whoever picks among
 /// endpoints; nothing here reads them.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) struct Endpoint {
   id : String
   host : String
   port : Int32
   weight : Int32
   metadata : Map[String, String]
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend Endpoint with Eq::{equal, not_equal}
@@ -119,12 +121,13 @@ pub fn Endpoint::parse(text : StringView) -> Endpoint raise Refused {
 ///|
 /// A registration: what `Registrar::register` hands back and takes again to renew or remove it.
 /// `token` is the backend's own handle (etcd's lease id, a Consul check), opaque to everyone else.
+#derive(Eq, Debug)
 pub(all) struct Lease {
   service : String
   endpoint : Endpoint
   ttl : Int32
   token : String
-} derive(Eq, Debug)
+}
 
 ///|
 pub extend Lease with Eq::{equal, not_equal}
@@ -135,10 +138,11 @@ pub extend Lease with Debug::{to_repr}
 ///|
 /// A service as it stands: all its live endpoints, and a revision that grows with every change a
 /// backend can number. A backend that numbers nothing counts its own updates.
+#derive(Eq, Debug, ToJson, FromJson)
 pub(all) struct Update {
   endpoints : Array[Endpoint]
   revision : Int64
-} derive(Eq, Debug, ToJson, FromJson)
+}
 
 ///|
 pub extend Update with Eq::{equal, not_equal}
