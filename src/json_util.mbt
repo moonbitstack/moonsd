@@ -333,11 +333,13 @@ pub fn parse_i64(s : StringView) -> Int64 {
 }
 
 ///|
-/// Percent-encode a query component, keeping only the RFC 3986 unreserved set.
+/// Percent-encode a path segment or a query component, keeping only the RFC
+/// 3986 unreserved set. The input is encoded as UTF-8 first, so a name outside
+/// ASCII arrives at the agent as the bytes the agent expects.
 pub fn url_encode(s : String) -> String {
   let mut out = ""
-  for ch in s {
-    let code = ch.to_int()
+  for byte in @utf8.encode(s) {
+    let code = byte.to_int()
     let ok = (code >= 65 && code <= 90) ||
       (code >= 97 && code <= 122) ||
       (code >= 48 && code <= 57) ||
@@ -346,7 +348,7 @@ pub fn url_encode(s : String) -> String {
       code == 95 ||
       code == 126
     if ok {
-      out = out + ch.to_string()
+      out = out + byte.to_char().to_string()
     } else {
       out = out + "%" + hex_digit(code / 16) + hex_digit(code % 16)
     }

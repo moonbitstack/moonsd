@@ -335,14 +335,16 @@ pub async fn Agent::service_register(
 }
 
 ///|
-/// Deregister the service instance `id` from this agent.
+/// Deregister the service instance `id` from this agent. An id may hold a space
+/// or a slash, so it goes into the path percent-encoded, as every id in this
+/// group does.
 pub async fn Agent::service_deregister(
   self : Agent,
   id : String,
   options~ : WriteOptions = default_write_options,
 ) -> WriteMeta raise Refused {
   let (_, meta) = self.client.do_put(
-    "/v1/agent/service/deregister/" + id,
+    "/v1/agent/service/deregister/" + url_encode(id),
     b"",
     options,
     [],
@@ -375,7 +377,7 @@ pub async fn Agent::check_deregister(
   options~ : WriteOptions = default_write_options,
 ) -> WriteMeta raise Refused {
   let (_, meta) = self.client.do_put(
-    "/v1/agent/check/deregister/" + check_id,
+    "/v1/agent/check/deregister/" + url_encode(check_id),
     b"",
     options,
     [],
@@ -392,7 +394,7 @@ pub async fn Agent::check_pass(
   options~ : WriteOptions = default_write_options,
 ) -> WriteMeta raise Refused {
   let (_, meta) = self.client.do_put(
-    "/v1/agent/check/pass/" + check_id,
+    "/v1/agent/check/pass/" + url_encode(check_id),
     b"",
     options,
     [],
@@ -408,7 +410,7 @@ pub async fn Agent::check_fail(
   options~ : WriteOptions = default_write_options,
 ) -> WriteMeta raise Refused {
   let (_, meta) = self.client.do_put(
-    "/v1/agent/check/fail/" + check_id,
+    "/v1/agent/check/fail/" + url_encode(check_id),
     b"",
     options,
     [],
@@ -428,7 +430,7 @@ pub async fn Agent::check_update(
   put_str(m, "Output", update.output)
   let body = @utf8.encode(@json.to_json(m).stringify())
   let (_, meta) = self.client.do_put(
-    "/v1/agent/check/update/" + update.check_id,
+    "/v1/agent/check/update/" + url_encode(update.check_id),
     body,
     options,
     [],
@@ -526,7 +528,7 @@ pub async fn Agent::join(
     extra.push(("wan", "1"))
   }
   let (_, meta) = self.client.do_put(
-    "/v1/agent/join/" + address,
+    "/v1/agent/join/" + url_encode(address),
     b"",
     options,
     extra,
@@ -552,7 +554,7 @@ pub async fn Agent::force_leave(
   options~ : WriteOptions = default_write_options,
 ) -> WriteMeta raise Refused {
   let (_, meta) = self.client.do_put(
-    "/v1/agent/force-leave/" + node,
+    "/v1/agent/force-leave/" + url_encode(node),
     b"",
     options,
     [],
@@ -575,7 +577,7 @@ pub async fn Agent::enable_service_maintenance(
     extra.push(("reason", reason))
   }
   let (_, meta) = self.client.do_put(
-    "/v1/agent/service/maintenance/" + service_id,
+    "/v1/agent/service/maintenance/" + url_encode(service_id),
     b"",
     options,
     extra,
@@ -591,7 +593,7 @@ pub async fn Agent::disable_service_maintenance(
   options~ : WriteOptions = default_write_options,
 ) -> WriteMeta raise Refused {
   let (_, meta) = self.client.do_put(
-    "/v1/agent/service/maintenance/" + service_id,
+    "/v1/agent/service/maintenance/" + url_encode(service_id),
     b"",
     options,
     [("enable", "false")],
