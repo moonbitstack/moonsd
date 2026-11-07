@@ -118,13 +118,15 @@ pub let default_service_registration : AgentServiceRegistration = {
 
 ///|
 /// The body of `PUT /v1/agent/check/register`: the identity fields plus the
-/// check definition folded in as `definition`.
+/// check definition folded in as `definition`. The agent names the check's id
+/// `ID` here, while a check nested in a service registration calls it
+/// `CheckID`; a registration binds a check to a service by id, so there is no
+/// field for the service's name.
 pub(all) struct AgentCheckRegistration {
   id : String?
   name : String
   notes : String?
   service_id : String?
-  service_name : String?
   ns : String?
   status : String?
   definition : AgentServiceCheck
@@ -243,7 +245,6 @@ fn agent_service_registration_to_json(r : AgentServiceRegistration) -> Json {
     Some(mm) => m["Meta"] = map_to_json(mm)
     None => ()
   }
-  put_str(m, "Namespace", r.ns)
   match r.check {
     Some(c) => m["Check"] = agent_service_check_to_json(c)
     None => ()
@@ -268,16 +269,36 @@ fn agent_service_registration_to_json(r : AgentServiceRegistration) -> Json {
 
 ///|
 /// An `AgentCheckRegistration` as its write body (the definition folded in).
+/// The definition's own `CheckID` is dropped: the registration's `ID` is the
+/// one the agent reads, and an unknown field is a refused request.
 fn agent_check_registration_to_json(r : AgentCheckRegistration) -> Json {
-  let m = json_map(agent_service_check_to_json(r.definition))
-  put_str(m, "CheckID", r.id)
+  let m = jobj()
+  for key, value in json_map(agent_service_check_to_json(r.definition)) {
+    if key != "CheckID" {
+      m[key] = value
+    }
+  }
+  put_str(m, "ID", r.id)
   put_str(m, "Name", Some(r.name))
   put_str(m, "Notes", r.notes)
   put_str(m, "ServiceID", r.service_id)
-  put_str(m, "ServiceName", r.service_name)
-  put_str(m, "Namespace", r.ns)
   put_str(m, "Status", r.status)
   @json.to_json(m)
+}
+
+///|
+/// `options` with the namespace a registration record names, unless the call
+/// already named one. Consul takes the namespace from the query, and refuses a
+/// body carrying it, so the record's namespace never reaches the body.
+fn with_ns(options : WriteOptions, ns : String?) -> WriteOptions {
+  match ns {
+    Some(n) =>
+      match options.ns {
+        Some(_) => options
+        None => { ..options, ns: Some(n), }
+      }
+    None => options
+  }
 }
 
 ///|
@@ -318,7 +339,8 @@ fn agent_self_of(j : Json) -> AgentSelf {
 
 ///|
 /// Register `reg` with this agent. A service with an inline TTL check starts
-/// `critical`; follow with `check_pass` to make it healthy.
+/// `critical`; follow with `check_pass` to make it healthy. A namespace on
+/// `reg` travels as the query parameter Consul reads it from.
 pub async fn Agent::service_register(
   self : Agent,
   reg : AgentServiceRegistration,
@@ -328,7 +350,7 @@ pub async fn Agent::service_register(
   let (_, meta) = self.client.do_put(
     "/v1/agent/service/register",
     body,
-    options,
+    with_ns(options, reg.ns),
     [],
   )
   meta
@@ -353,7 +375,8 @@ pub async fn Agent::service_deregister(
 }
 
 ///|
-/// Register `reg` (a check, optionally bound to a service) with this agent.
+/// Register `reg` (a check, optionally bound to a service by id) with this
+/// agent.
 pub async fn Agent::check_register(
   self : Agent,
   reg : AgentCheckRegistration,
@@ -363,7 +386,7 @@ pub async fn Agent::check_register(
   let (_, meta) = self.client.do_put(
     "/v1/agent/check/register",
     body,
-    options,
+    with_ns(options, reg.ns),
     [],
   )
   meta

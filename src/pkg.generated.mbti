@@ -275,7 +275,6 @@ pub(all) struct AgentCheckRegistration {
   name : String
   notes : String?
   service_id : String?
-  service_name : String?
   ns : String?
   status : String?
   definition : AgentServiceCheck
