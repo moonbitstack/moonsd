@@ -1,28 +1,39 @@
 # moonconsul
 
-A Consul client for MoonBit, with the surface of HashiCorp's Go
-[`consul/api`](https://github.com/hashicorp/consul/tree/main/api): Agent,
-Catalog, Health, KV, Session, Event, ACL, Status, Coordinate, Prepared Query,
-Config Entries and Connect, plus locks, semaphores and watches. MoonBit types and
-`snake_case` names follow the organisation's conventions; the wire format,
-endpoints and semantics follow that package, and the tests run against real
-agents.
+A Consul client for MoonBit: an agent's services and checks, the catalog and
+health endpoints, the key/value store with compare-and-swap, sessions, locks and
+semaphores, events, ACLs, prepared queries, config entries and Connect, with
+blocking queries and a watch loop on top. Calls are asynchronous, every failure
+is one error type, and the module builds for every backend from MoonBit's own
+libraries and this organisation's.
 
 ## Quick start
 
-```moonbit
+```mbt native
 async fn main {
   let client = @fetch.connect()
+  let pair : @moonconsul.KVPair = {
+    key: "config/theme",
+    create_index: 0UL,
+    modify_index: 0UL,
+    lock_index: 0UL,
+    flags: 0UL,
+    value: @utf8.encode("dark"),
+    session: None,
+  }
   ignore(client.kv().put(pair))
-  let lock = @concurrency.Lock::new(client, "jobs/nightly")
-  lock.hold(() => run_the_job())
+  match client.kv().get("config/theme").0 {
+    Some(stored) => println(@utf8.decode_lossy(stored.value[:]))
+    None => println("config/theme is not set")
+  }
 }
 ```
 
-`moonconsul` needs nothing but a `Transport`, so it runs on every backend.
-`moonconsul/fetch` is the transport over moonfetch; `connect(config~)` gives a
-client for the agent `config` names, and `default_config` is
-`http://127.0.0.1:8500` with no token.
+`moonconsul` itself needs nothing but a `Transport`, so the root package builds
+for every backend. `moonconsul/fetch` is the transport over moonfetch — native
+and wasm — and `connect(config~)` gives a client for the agent `config` names;
+`default_config` is `http://127.0.0.1:8500` with no token. The blocks here go
+through it, so they are marked `native`.
 
 | Package | Holds |
 |:--|:--|
@@ -49,7 +60,7 @@ maintenance mode.
 |:--|:--|
 | `service_register(reg, options~)` | Register a service (with inline checks) on this agent |
 | `service_deregister(id, options~)` | Deregister a service instance |
-| `check_register(reg, options~)` | Register a check (optionally bound to a service) |
+| `check_register(reg, options~)` | Register a check, optionally bound to a service by id |
 | `check_deregister(check_id, options~)` | Deregister a check |
 | `check_pass(check_id, options~)` | Mark a TTL/HTTP/TCP/gRPC check passing |
 | `check_fail(check_id, options~)` | Mark a check failing |
@@ -68,6 +79,38 @@ maintenance mode.
 | `connect_roots(options~)` | The Connect CA roots this agent trusts (blocking) |
 | `connect_leaf(service_id, options~)` | Issue a leaf certificate for a service |
 | `connect_authorize(params, options~)` | Whether a client certificate may reach a service |
+
+An id is free-form: a service id, a check id, a node name or an address may hold
+a space, a slash or a colon. Each one goes into the path percent-encoded, so it
+arrives at the agent as one segment: deregistering the service `web 1/eu`
+requests `/v1/agent/service/deregister/web%201%2Feu`, and joining
+`10.0.0.1:8301` requests `/v1/agent/join/10.0.0.1%3A8301`. Names outside ASCII
+travel as their UTF-8 bytes.
+
+```mbt native
+let client = @fetch.connect()
+ignore(
+  client
+  .agent()
+  .service_register({
+    ..@moonconsul.default_service_registration,
+    id: Some("web 1/eu"),
+    name: "web",
+    port: Some(8080),
+    tags: Some(["blue"]),
+    check: Some({
+      ..@moonconsul.default_service_check,
+      ttl: Some("30s"),
+      status: Some("critical"),
+    }),
+  }),
+)
+// A service's own check is named after the service id.
+ignore(client.agent().check_pass("service:web 1/eu"))
+let (instances, _) = client.health().service("web", passing=true)
+println("\{instances.length()} passing instance(s)")
+ignore(client.agent().service_deregister("web 1/eu"))
+```
 
 ### Catalog — `client.catalog()`
 
@@ -226,7 +269,7 @@ A leaf's identity is its SPIFFE URI, `spiffe://<trust domain>/ns/<namespace>/dc/
 <datacenter>/svc/<service>`, and the certificate carries it. `LeafCert` hands
 back the certificate, its key, the serial number and that URI:
 
-```moonbit
+```mbt native
 let (leaf, _) = client.agent().connect_leaf("web")
 let (decision, _) = client
   .agent()
@@ -244,32 +287,31 @@ println("\{leaf.service_uri}: \{decision.authorized} (\{decision.reason})")
 JSON the agent serves. `precedence` is the agent's ranking — an exact pair
 outranks a wildcard — and every list this API returns is ordered by it.
 
-```moonbit
+```mbt native
 let rule = {
-  ..@moonconsul.Intention::new("web", "db", Allow),
+  ..@moonconsul.Intention::new("web", "db", @moonconsul.Allow),
   description: Some("the web tier writes to the database"),
 }
 ignore(client.connect().intention_upsert(rule))
 
 let allowed = client.connect().intention_check("web", "db").0
-let (matched, _) = client.connect().intention_match(Source, ["web"])
+let (matched, _) = client.connect().intention_match(@moonconsul.Source, ["web"])
 let rules = matched.get("web").unwrap_or([])
 println("\{allowed}, with \{rules.length()} intentions to consider")
 ```
 
 ### Locks and semaphores
 
-`@concurrency.Lock` and `@concurrency.Semaphore` run the protocol of Go's
-`api.Lock` and `api.Semaphore`, which is what `consul lock` runs, so a lock here
-and one held by that command exclude each other. A test checks this against the
-command.
+`@concurrency.Lock` and `@concurrency.Semaphore` run the protocol of `consul
+lock` and `consul lock -n`: a lock taken here excludes one taken by that
+command, and the other way round.
 
-```moonbit
+```mbt native
 let lock = @concurrency.Lock::new(client, "jobs/nightly")
-lock.hold(() => run_the_job())
+lock.hold(() => println("the job runs with the lock"))
 
 let seats = @concurrency.Semaphore::new(client, "jobs/workers", 4)
-seats.hold(() => run_a_worker())
+seats.hold(() => println("a worker has one of four seats"))
 ```
 
 | Method | Does |
@@ -281,28 +323,50 @@ seats.hold(() => run_a_worker())
 | `destroy()` | Delete the keys of one nobody holds |
 
 Cancelling the task gives up a wait, so `@async.with_timeout` bounds one.
-`LockOptions` and `SemaphoreOptions` default to Go's values; pass `session` to
-run on a session of your own, which then stays yours to renew and destroy.
+`LockOptions` and `SemaphoreOptions` default to the settings of the `consul`
+command; pass `session` to run on a session of your own, which then stays yours
+to renew and destroy.
 
 ### Blocking queries and watches
 
 Reads take `QueryOptions`: set `wait_index` and `wait_time` to make a blocking
 query, and feed the returned `QueryMeta.last_index` into the next call.
 
-`@concurrency.watch(client, kind, handler)` is that loop, and runs until its task
+```mbt native
+let (value, meta) = client.poll(@moonconsul.Key("config/theme"), options={
+  ..@moonconsul.default_query_options,
+  wait_index: Some(0UL),
+  wait_time: Some(60_000_000_000L),
+})
+match value {
+  Some(seen) => println("index \{meta.last_index}: \{seen.stringify()}")
+  None => println("the key is absent")
+}
+```
+
+`@concurrency.watch(client, kind, handler)` is that loop, running until its task
 is cancelled. `kind` is a `WatchKind`, one per watch type of Consul's: `Key`,
 `KeyPrefix`, `Services`, `Nodes`, `Service`, `Checks`, `State`, `Event`,
 `ConnectRoots`, `ConnectLeaf`, `AgentService`.
 
-```moonbit
-@concurrency.watch(client, Service("web", passing=true), (index, value) => {
-  println("\{index}: \{value.stringify()}")
+```mbt native
+@async.with_task_group(group => {
+  group.spawn_bg(no_wait=true, () => @concurrency.watch(
+    client,
+    @moonconsul.Service("web", passing=true),
+    (index, value) => println("\{index}: \{value.stringify()}"),
+    options={ ..@moonconsul.default_query_options, wait_time: Some(10_000_000_000L) },
+  ))
+  @async.sleep(1_000)
 })
 ```
 
-`handler` is called when the value changes, not each time the index moves. A
-failed query is tried again after `retry` milliseconds, then 4, 9, 16... times
-that, up to `limit`, as in Go's `watch.Plan`. `Client::poll` is one round of it.
+`handler` is called when the value changes, not each time the index moves. One
+round waits at most `options.wait_time`, so a short value keeps cancellation
+prompt; without one the agent holds the request for five minutes. A failed query
+is tried again after `retry` milliseconds, then 4, 9, 16... times that, up to
+`limit`, as the `consul` command's own watcher does. `Client::poll` is one round
+of it.
 
 ## Options and metadata
 
@@ -315,6 +379,9 @@ that, up to `limit`, as in Go's `watch.Plan`. `Client::poll` is one round of it.
 * `QueryMeta` — `last_index`, `last_hash`, `last_contact`, `known_leader`,
   `request_time`.
 * `WriteMeta` — `request_time`.
+
+The namespace travels in the query, where the agent reads it, and never in a
+body: an agent without namespaces refuses a body that carries one.
 
 ## Errors
 
@@ -336,33 +403,13 @@ program uses:
 
 ```moonbit
 pub(open) trait Transport {
-  async fn send(Self, Request) -> Response raise Refused
+  async fn send(Self, @moonconsul.Request) -> @moonconsul.Response raise @moonconsul.Refused
 }
 ```
 
 `Request` and `Response` carry the verb, URL, headers, body and status. Implement
-the trait to send through something else; the white-box tests use one that
-returns canned bytes.
-
-## The gate
-
-Every commit passes this, with each exit code seen to be zero:
-
-```bash
-moon clean && moon fmt && moon check --target all --deny-warn \
-  && moon build --target all && moon test --target all
-```
-
-`src/integration` runs against real agents: `scripts/start_consul.sh` starts two
-in Docker, one with ACLs on, and `MOONCONSUL_LIVE=1` makes a missing agent a
-failure instead of a skip. `MOONCONSUL_CONTAINER` names the container whose
-`consul` command the interoperability tests run.
-
-## Releasing
-
-Push a signed tag `v<version>`. `release.yml` runs the tests first and publishes
-only if they pass and the organisation variable `MOONCAKES_PUBLISH` is `true`.
-The major version stays at 0.
+the trait to send through something else, such as a connection of your own or a
+queue for a replay.
 
 ## License
 
