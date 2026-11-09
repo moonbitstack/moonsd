@@ -1,6 +1,6 @@
 name = "moonbitstack/moonredis"
 
-version = "0.1.5"
+version = "0.1.6"
 
 readme = "README.md"
 
@@ -45,8 +45,8 @@ description = "A Redis client for MoonBit: RESP2 and RESP3, pipelines, transacti
 source = "src"
 
 import {
-  "moonbitstack/moonsd@0.1.1",
-  "moonbitstack/moonnet@0.1.11",
-  "moonbitstack/moontls@0.9.15",
+  "moonbitstack/moonsd@0.1.2",
+  "moonbitstack/moonnet@0.1.12",
+  "moonbitstack/moontls@0.9.16",
   "moonbitlang/async@0.22.5",
 }
