@@ -1,0 +1,724 @@
+///|
+/// A handle to the Agent API: register and deregister services and checks on
+/// this agent, keep TTL checks alive, read the agent's own state, and manage
+/// cluster membership and maintenance mode.
+pub struct Agent {
+  client : Client
+}
+
+///|
+/// A health check registered alongside a service or on its own. One of `ttl`,
+/// `interval`+`script`/`http`/`tcp`/`grpc`, or `alias_*` selects the check
+/// kind; `deregister_critical_service_after` lets a failing check auto-remove
+/// its service.
+pub(all) struct AgentServiceCheck {
+  id : String?
+  name : String?
+  notes : String?
+  service_id : String?
+  status : String?
+  ttl : String?
+  interval : String?
+  timeout : String?
+  http : String?
+  tls_skip_verify : Bool?
+  http_method : String?
+  tcp : String?
+  grpc : String?
+  grpc_use_tls : Bool?
+  header : Map[String, Array[String]]?
+  deregister_critical_service_after : String?
+  alias_node : String?
+  alias_service : String?
+  success_before_passing : Int32?
+  failures_before_critical : Int32?
+}
+
+///|
+/// The primary and passing weights of a service, used by DNS and prepared
+/// queries. `passing` defaults to 1 and `warning` to 1 when unset.
+pub(all) struct AgentWeights {
+  passing : Int32?
+  warning : Int32?
+}
+
+///|
+/// A service registered on this agent. `id` defaults to `name` when empty; `tags`
+/// and `meta` are free-form; `address` and `port` are where the instance listens
+/// (when unset, the agent's address is used).
+pub(all) struct AgentService {
+  id : String
+  service : String
+  tags : Array[String]
+  address : String?
+  port : Int32?
+  meta : Map[String, String]?
+  ns : String?
+  weights : AgentWeights?
+}
+
+///|
+/// The body of `PUT /v1/agent/service/register`: a service plus at most one
+/// inline check (`check`) or several (`checks`); `enable_tag_override` lets the
+/// agent's tags be overridden by the catalog.
+pub(all) struct AgentServiceRegistration {
+  id : String?
+  name : String
+  tags : Array[String]?
+  address : String?
+  port : Int32?
+  meta : Map[String, String]?
+  ns : String?
+  check : AgentServiceCheck?
+  checks : Array[AgentServiceCheck]?
+  enable_tag_override : Bool?
+  weights : AgentWeights?
+}
+
+///|
+/// A check with nothing set, to update the fields a check needs.
+pub let default_service_check : AgentServiceCheck = {
+  id: None,
+  name: None,
+  notes: None,
+  service_id: None,
+  status: None,
+  ttl: None,
+  interval: None,
+  timeout: None,
+  http: None,
+  tls_skip_verify: None,
+  http_method: None,
+  tcp: None,
+  grpc: None,
+  grpc_use_tls: None,
+  header: None,
+  deregister_critical_service_after: None,
+  alias_node: None,
+  alias_service: None,
+  success_before_passing: None,
+  failures_before_critical: None,
+}
+
+///|
+/// A registration with nothing set but an empty name, to update the fields a service needs.
+pub let default_service_registration : AgentServiceRegistration = {
+  id: None,
+  name: "",
+  tags: None,
+  address: None,
+  port: None,
+  meta: None,
+  ns: None,
+  check: None,
+  checks: None,
+  enable_tag_override: None,
+  weights: None,
+}
+
+///|
+/// The body of `PUT /v1/agent/check/register`: the identity fields plus the
+/// check definition folded in as `definition`. The agent names the check's id
+/// `ID` here, while a check nested in a service registration calls it
+/// `CheckID`; a registration binds a check to a service by id, so there is no
+/// field for the service's name.
+pub(all) struct AgentCheckRegistration {
+  id : String?
+  name : String
+  notes : String?
+  service_id : String?
+  ns : String?
+  status : String?
+  definition : AgentServiceCheck
+}
+
+///|
+/// A check as reported by `self` and the check endpoints: its id, name, current
+/// `status` (`passing`, `warning`, `critical`), `output`, and the service it
+/// guards.
+pub(all) struct AgentCheck {
+  id : String
+  name : String?
+  status : String?
+  notes : String?
+  output : String?
+  service_id : String?
+  service_name : String?
+  ns : String?
+}
+
+///|
+/// The body of `PUT /v1/agent/check/update`: set a TTL check's `status` and
+/// `output` without sending a fresh TTL. `check_id` names the check to update.
+pub(all) struct AgentCheckUpdate {
+  check_id : String
+  status : String
+  output : String?
+}
+
+///|
+/// A cluster member as seen by the agent's gossip layer: its `name`, `addr`,
+/// `port`, `status`, and the `tags` it gossips (including `role`, `dc`, `vsn`).
+pub(all) struct AgentMember {
+  name : String
+  addr : String
+  port : Int32
+  tags : Map[String, String]?
+  status : String?
+}
+
+///|
+/// The agent's own state: its `config`, its `agent_member` record, and `stats`.
+pub(all) struct AgentSelf {
+  config : Json
+  agent_member : AgentMember
+  stats : Json
+}
+
+///|
+/// An `AgentWeights` as a JSON object.
+fn agent_weights_to_json(w : AgentWeights) -> Json {
+  let m = jobj()
+  put_i32(m, "Passing", w.passing)
+  put_i32(m, "Warning", w.warning)
+  @json.to_json(m)
+}
+
+///|
+/// A `Map[String, Array[String]]` (check headers) as a JSON object.
+fn headers_to_json(h : Map[String, Array[String]]) -> Json {
+  let out : Map[String, Json] = Map([])
+  for k, v in h {
+    let arr : Array[Json] = []
+    for s in v {
+      arr.push(@json.to_json(s))
+    }
+    out[k] = @json.to_json(arr)
+  }
+  @json.to_json(out)
+}
+
+///|
+/// An `AgentServiceCheck` as a JSON object.
+fn agent_service_check_to_json(c : AgentServiceCheck) -> Json {
+  let m = jobj()
+  put_str(m, "CheckID", c.id)
+  put_str(m, "Name", c.name)
+  put_str(m, "Notes", c.notes)
+  put_str(m, "ServiceID", c.service_id)
+  put_str(m, "Status", c.status)
+  put_str(m, "TTL", c.ttl)
+  put_str(m, "Interval", c.interval)
+  put_str(m, "Timeout", c.timeout)
+  put_str(m, "HTTP", c.http)
+  put_bool(m, "TLSSkipVerify", c.tls_skip_verify)
+  put_str(m, "Method", c.http_method)
+  put_str(m, "TCP", c.tcp)
+  put_str(m, "GRPC", c.grpc)
+  put_bool(m, "GRPCUseTLS", c.grpc_use_tls)
+  match c.header {
+    Some(h) => m["Header"] = headers_to_json(h)
+    None => ()
+  }
+  put_str(
+    m,
+    "DeregisterCriticalServiceAfter",
+    c.deregister_critical_service_after,
+  )
+  put_str(m, "AliasNode", c.alias_node)
+  put_str(m, "AliasService", c.alias_service)
+  put_i32(m, "SuccessBeforePassing", c.success_before_passing)
+  put_i32(m, "FailuresBeforeCritical", c.failures_before_critical)
+  @json.to_json(m)
+}
+
+///|
+/// An `AgentServiceRegistration` as its write body.
+fn agent_service_registration_to_json(r : AgentServiceRegistration) -> Json {
+  let m = jobj()
+  put_str(m, "ID", r.id)
+  put_str(m, "Name", Some(r.name))
+  put_str_array(m, "Tags", r.tags)
+  put_str(m, "Address", r.address)
+  put_i32(m, "Port", r.port)
+  match r.meta {
+    Some(mm) => m["Meta"] = map_to_json(mm)
+    None => ()
+  }
+  match r.check {
+    Some(c) => m["Check"] = agent_service_check_to_json(c)
+    None => ()
+  }
+  match r.checks {
+    Some(cs) => {
+      let arr : Array[Json] = []
+      for c in cs {
+        arr.push(agent_service_check_to_json(c))
+      }
+      m["Checks"] = @json.to_json(arr)
+    }
+    None => ()
+  }
+  put_bool(m, "EnableTagOverride", r.enable_tag_override)
+  match r.weights {
+    Some(w) => m["Weights"] = agent_weights_to_json(w)
+    None => ()
+  }
+  @json.to_json(m)
+}
+
+///|
+/// An `AgentCheckRegistration` as its write body (the definition folded in).
+/// The definition's own `CheckID` is dropped: the registration's `ID` is the
+/// one the agent reads, and an unknown field is a refused request.
+fn agent_check_registration_to_json(r : AgentCheckRegistration) -> Json {
+  let m = jobj()
+  for key, value in json_map(agent_service_check_to_json(r.definition)) {
+    if key != "CheckID" {
+      m[key] = value
+    }
+  }
+  put_str(m, "ID", r.id)
+  put_str(m, "Name", Some(r.name))
+  put_str(m, "Notes", r.notes)
+  put_str(m, "ServiceID", r.service_id)
+  put_str(m, "Status", r.status)
+  @json.to_json(m)
+}
+
+///|
+/// `options` with the namespace a registration record names, unless the call
+/// already named one. Consul takes the namespace from the query, and refuses a
+/// body carrying it, so the record's namespace never reaches the body.
+fn with_ns(options : WriteOptions, ns : String?) -> WriteOptions {
+  match ns {
+    Some(n) =>
+      match options.ns {
+        Some(_) => options
+        None => { ..options, ns: Some(n), }
+      }
+    None => options
+  }
+}
+
+///|
+/// An `AgentMember` from its JSON object.
+fn agent_member_of(j : Json) -> AgentMember {
+  let m = json_map(j)
+  {
+    name: jstr(m, "Name"),
+    addr: jstr(m, "Addr"),
+    port: ji32(m, "Port"),
+    tags: jmap_opt(m, "Tags"),
+    status: jstr_opt(m, "Status"),
+  }
+}
+
+///|
+/// An `AgentSelf` from its JSON object.
+fn agent_self_of(j : Json) -> AgentSelf {
+  let m = json_map(j)
+  let mem_rec = agent_member_of(
+    match m.get("Member") {
+      Some(x) => x
+      None => @json.to_json(jobj())
+    },
+  )
+  {
+    config: match m.get("Config") {
+      Some(c) => c
+      None => @json.to_json(jobj())
+    },
+    agent_member: mem_rec,
+    stats: match m.get("Stats") {
+      Some(s) => s
+      None => @json.to_json(jobj())
+    },
+  }
+}
+
+///|
+/// Register `reg` with this agent. A service with an inline TTL check starts
+/// `critical`; follow with `check_pass` to make it healthy. A namespace on
+/// `reg` travels as the query parameter Consul reads it from.
+pub async fn Agent::service_register(
+  self : Agent,
+  reg : AgentServiceRegistration,
+  options~ : WriteOptions = default_write_options,
+) -> WriteMeta raise Refused {
+  let body = @utf8.encode(agent_service_registration_to_json(reg).stringify())
+  let (_, meta) = self.client.do_put(
+    "/v1/agent/service/register",
+    body,
+    with_ns(options, reg.ns),
+    [],
+  )
+  meta
+}
+
+///|
+/// Deregister the service instance `id` from this agent. An id may hold a space
+/// or a slash, so it goes into the path percent-encoded, as every id in this
+/// group does.
+pub async fn Agent::service_deregister(
+  self : Agent,
+  id : String,
+  options~ : WriteOptions = default_write_options,
+) -> WriteMeta raise Refused {
+  let (_, meta) = self.client.do_put(
+    "/v1/agent/service/deregister/" + url_encode(id),
+    b"",
+    options,
+    [],
+  )
+  meta
+}
+
+///|
+/// Register `reg` (a check, optionally bound to a service by id) with this
+/// agent.
+pub async fn Agent::check_register(
+  self : Agent,
+  reg : AgentCheckRegistration,
+  options~ : WriteOptions = default_write_options,
+) -> WriteMeta raise Refused {
+  let body = @utf8.encode(agent_check_registration_to_json(reg).stringify())
+  let (_, meta) = self.client.do_put(
+    "/v1/agent/check/register",
+    body,
+    with_ns(options, reg.ns),
+    [],
+  )
+  meta
+}
+
+///|
+/// Deregister the check `check_id` from this agent.
+pub async fn Agent::check_deregister(
+  self : Agent,
+  check_id : String,
+  options~ : WriteOptions = default_write_options,
+) -> WriteMeta raise Refused {
+  let (_, meta) = self.client.do_put(
+    "/v1/agent/check/deregister/" + url_encode(check_id),
+    b"",
+    options,
+    [],
+  )
+  meta
+}
+
+///|
+/// Mark the TTL/http/tcp/grpc check `check_id` passing; the keep-alive that
+/// renews a service's lease.
+pub async fn Agent::check_pass(
+  self : Agent,
+  check_id : String,
+  options~ : WriteOptions = default_write_options,
+) -> WriteMeta raise Refused {
+  let (_, meta) = self.client.do_put(
+    "/v1/agent/check/pass/" + url_encode(check_id),
+    b"",
+    options,
+    [],
+  )
+  meta
+}
+
+///|
+/// Mark the check `check_id` failing.
+pub async fn Agent::check_fail(
+  self : Agent,
+  check_id : String,
+  options~ : WriteOptions = default_write_options,
+) -> WriteMeta raise Refused {
+  let (_, meta) = self.client.do_put(
+    "/v1/agent/check/fail/" + url_encode(check_id),
+    b"",
+    options,
+    [],
+  )
+  meta
+}
+
+///|
+/// Set a TTL check's `status` and `output` without resetting its TTL clock.
+pub async fn Agent::check_update(
+  self : Agent,
+  update : AgentCheckUpdate,
+  options~ : WriteOptions = default_write_options,
+) -> WriteMeta raise Refused {
+  let m = jobj()
+  put_str(m, "Status", Some(update.status))
+  put_str(m, "Output", update.output)
+  let body = @utf8.encode(@json.to_json(m).stringify())
+  let (_, meta) = self.client.do_put(
+    "/v1/agent/check/update/" + url_encode(update.check_id),
+    body,
+    options,
+    [],
+  )
+  meta
+}
+
+///|
+/// The agent's own configuration, member record and runtime stats.
+pub async fn Agent::self(
+  self : Agent,
+  options~ : QueryOptions = default_query_options,
+) -> (AgentSelf, QueryMeta) raise Refused {
+  let (json, meta) = self.client.do_get("/v1/agent/self", options, [])
+  (agent_self_of(json), meta)
+}
+
+///|
+/// The services registered with this agent, by id.
+pub async fn Agent::services(
+  self : Agent,
+  options~ : QueryOptions = default_query_options,
+) -> (Map[String, AgentService], QueryMeta) raise Refused {
+  let (json, meta) = self.client.do_get("/v1/agent/services", options, [])
+  let out : Map[String, AgentService] = Map([])
+  guard json is Object(entries) else {
+    raise Refused::Json("agent services: expected an object")
+  }
+  for id, value in entries {
+    out[id] = agent_service_of(value)
+  }
+  (out, meta)
+}
+
+///|
+/// The checks registered with this agent, by id.
+pub async fn Agent::checks(
+  self : Agent,
+  options~ : QueryOptions = default_query_options,
+) -> (Map[String, HealthCheck], QueryMeta) raise Refused {
+  let (json, meta) = self.client.do_get("/v1/agent/checks", options, [])
+  let out : Map[String, HealthCheck] = Map([])
+  guard json is Object(entries) else {
+    raise Refused::Json("agent checks: expected an object")
+  }
+  for id, value in entries {
+    out[id] = health_check_of(value)
+  }
+  (out, meta)
+}
+
+///|
+/// The cluster members this agent gossips with. `options.filter` (a
+/// go-compatible tag expression) narrows the returned set.
+pub async fn Agent::members(
+  self : Agent,
+  options~ : QueryOptions = default_query_options,
+) -> (Array[AgentMember], QueryMeta) raise Refused {
+  let (json, meta) = self.client.do_get("/v1/agent/members", options, [])
+  let out : Array[AgentMember] = []
+  for item in json_array(json) {
+    out.push(agent_member_of(item))
+  }
+  (out, meta)
+}
+
+///|
+/// Like `members`, but `filter` is required rather than optional.
+pub async fn Agent::members_with_filter(
+  self : Agent,
+  filter : String,
+  options~ : QueryOptions = default_query_options,
+) -> (Array[AgentMember], QueryMeta) raise Refused {
+  let (json, meta) = self.client.do_get("/v1/agent/members", options, [
+    ("filter", filter),
+  ])
+  let out : Array[AgentMember] = []
+  for item in json_array(json) {
+    out.push(agent_member_of(item))
+  }
+  (out, meta)
+}
+
+///|
+/// Ask the agent at `address` to join the cluster; `wan` joins over the WAN
+/// gossip pool rather than the LAN pool.
+pub async fn Agent::join(
+  self : Agent,
+  address : String,
+  wan~ : Bool = false,
+  options~ : WriteOptions = default_write_options,
+) -> WriteMeta raise Refused {
+  let extra : Array[(String, String)] = []
+  if wan {
+    extra.push(("wan", "1"))
+  }
+  let (_, meta) = self.client.do_put(
+    "/v1/agent/join/" + url_encode(address),
+    b"",
+    options,
+    extra,
+  )
+  meta
+}
+
+///|
+/// Ask this agent to leave the cluster gracefully.
+pub async fn Agent::leave(
+  self : Agent,
+  options~ : WriteOptions = default_write_options,
+) -> WriteMeta raise Refused {
+  let (_, meta) = self.client.do_put("/v1/agent/leave", b"", options, [])
+  meta
+}
+
+///|
+/// Force a `node` out of the cluster without its cooperation.
+pub async fn Agent::force_leave(
+  self : Agent,
+  node : String,
+  options~ : WriteOptions = default_write_options,
+) -> WriteMeta raise Refused {
+  let (_, meta) = self.client.do_put(
+    "/v1/agent/force-leave/" + url_encode(node),
+    b"",
+    options,
+    [],
+  )
+  meta
+}
+
+///|
+/// Put the service instance `service_id` into maintenance mode, marking its
+/// checks `maintenance` with `reason`; the instance stays registered but looks
+/// down to health checks.
+pub async fn Agent::enable_service_maintenance(
+  self : Agent,
+  service_id : String,
+  reason~ : String = "",
+  options~ : WriteOptions = default_write_options,
+) -> WriteMeta raise Refused {
+  let extra : Array[(String, String)] = [("enable", "true")]
+  if reason != "" {
+    extra.push(("reason", reason))
+  }
+  let (_, meta) = self.client.do_put(
+    "/v1/agent/service/maintenance/" + url_encode(service_id),
+    b"",
+    options,
+    extra,
+  )
+  meta
+}
+
+///|
+/// Take the service instance `service_id` out of maintenance mode.
+pub async fn Agent::disable_service_maintenance(
+  self : Agent,
+  service_id : String,
+  options~ : WriteOptions = default_write_options,
+) -> WriteMeta raise Refused {
+  let (_, meta) = self.client.do_put(
+    "/v1/agent/service/maintenance/" + url_encode(service_id),
+    b"",
+    options,
+    [("enable", "false")],
+  )
+  meta
+}
+
+///|
+/// Put the whole node into maintenance mode.
+pub async fn Agent::enable_node_maintenance(
+  self : Agent,
+  reason~ : String = "",
+  options~ : WriteOptions = default_write_options,
+) -> WriteMeta raise Refused {
+  let extra : Array[(String, String)] = [("enable", "true")]
+  if reason != "" {
+    extra.push(("reason", reason))
+  }
+  let (_, meta) = self.client.do_put(
+    "/v1/agent/node/maintenance", b"", options, extra,
+  )
+  meta
+}
+
+///|
+/// Take the node out of maintenance mode.
+pub async fn Agent::disable_node_maintenance(
+  self : Agent,
+  options~ : WriteOptions = default_write_options,
+) -> WriteMeta raise Refused {
+  let (_, meta) = self.client.do_put(
+    "/v1/agent/node/maintenance",
+    b"",
+    options,
+    [("enable", "false")],
+  )
+  meta
+}
+
+///|
+/// Replace the agent's ACL token (used when the local token must change without
+/// restarting the agent).
+pub async fn Agent::update_acl_token(
+  self : Agent,
+  token : String,
+  options~ : WriteOptions = default_write_options,
+) -> WriteMeta raise Refused {
+  let m = jobj()
+  put_str(m, "Token", Some(token))
+  let body = @utf8.encode(Json::object(m).stringify())
+  let (_, meta) = self.client.do_put(
+    "/v1/agent/token/acl_token",
+    body,
+    options,
+    [],
+  )
+  meta
+}
+
+///|
+/// The roots this agent's Connect CA trusts, with the blocking-query metadata
+/// that lets a caller wait for a CA rotation.
+pub async fn Agent::connect_roots(
+  self : Agent,
+  options~ : QueryOptions = default_query_options,
+) -> (CARoots, QueryMeta) raise Refused {
+  let (json, meta) = self.client.do_get("/v1/agent/connect/ca/roots", options, [])
+  (caroots_of(json), meta)
+}
+
+///|
+/// Issue a leaf certificate for the service instance `service_id`. The name is
+/// a path segment, so it is percent-encoded; the identity the agent puts in the
+/// certificate is `spiffe://<trust domain>/ns/<namespace>/dc/<datacenter>/svc/
+/// <service_id>`.
+pub async fn Agent::connect_leaf(
+  self : Agent,
+  service_id : String,
+  options~ : QueryOptions = default_query_options,
+) -> (LeafCert, QueryMeta) raise Refused {
+  let (json, meta) = self.client.do_get(
+    "/v1/agent/connect/ca/leaf/" + url_encode(service_id),
+    options,
+    [],
+  )
+  (leaf_cert_of(json), meta)
+}
+
+///|
+/// Ask the agent whether the client certificate described by `params` may open
+/// a connection to `params.target`, by the intentions in place.
+pub async fn Agent::connect_authorize(
+  self : Agent,
+  params : AgentAuthorizeParams,
+  options~ : WriteOptions = default_write_options,
+) -> (AgentAuthorize, WriteMeta) raise Refused {
+  let body = @utf8.encode(agent_authorize_params_to_json(params).stringify())
+  let (json, meta) = self.client.do_post(
+    "/v1/agent/connect/authorize",
+    body,
+    options,
+    [],
+  )
+  (agent_authorize_of(json), meta)
+}

@@ -1,0 +1,24 @@
+// Integration tests against a live redis: they dial 127.0.0.1:6379 and, when nothing is
+// listening, return early so the suite still passes without a server. CI starts a redis for
+// them. They are native-only because they open real sockets. The package holds only tests,
+// so its imports are test-only.
+import {
+  "moonbitstack/moonredis",
+  "moonbitstack/moonredis/resp",
+  "moonbitstack/moonredis/sd",
+  "moonbitstack/moonredis/socket",
+  "moonbitstack/moonsd",
+  "moonbitstack/moonsd/conformance",
+  "moonbitlang/async",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+  "moonbitlang/core/string",
+} for "test"
+
+supported_targets = "native"
+
+// The module tests share one server, and the search module keeps its indexes in database
+// 0 for the whole server, so they run one at a time.
+
+max_concurrent_tests = 1

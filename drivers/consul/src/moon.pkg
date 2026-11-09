@@ -1,0 +1,13 @@
+// moonconsul: a Consul client for MoonBit, mirroring HashiCorp's Go
+// `consul/api` package. Specification (authoritative):
+// https://github.com/hashicorp/consul/tree/main/api
+
+import {
+  "moonbitlang/core/json",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/encoding/base64",
+}
+
+import {
+  "moonbitlang/async",
+} for "wbtest"

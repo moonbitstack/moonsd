@@ -1,0 +1,24 @@
+// Integration tests against a real etcd. The CI starts etcd before running these;
+// without one they skip (the connect check fails fast and the test returns). Every
+// test uses its own key prefix so runs do not collide.
+
+supported_targets = "native"
+
+import {
+  "moonbitstack/moonetcd",
+  "moonbitstack/moonetcd/client",
+  "moonbitstack/moonetcd/concurrency",
+  "moonbitstack/moonetcd/sd",
+  "moonbitstack/moonsd",
+  "moonbitstack/moonsd/conformance",
+  "moonbitlang/async",
+  "moonbitlang/async/fs",
+  "moonbitlang/async/process",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/buffer",
+  "moonbitlang/core/env",
+} for "test"
+
+// Compaction and a dying member reach every test on the cluster, so these go one at a time.
+
+max_concurrent_tests = 1
