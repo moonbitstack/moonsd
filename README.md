@@ -2,17 +2,30 @@
 
 The contract of service discovery for MoonBit: what a registry does, and nothing about any one registry. A backend implements three small traits and gets the rest; a framework depends on the traits and works with every backend.
 
-```moonbit
-// A service keeps itself registered for as long as this task runs, and leaves on the way out.
-group.spawn_bg(() => @moonsd.hold(registry, "greeter", @moonsd.Endpoint::new("10.0.0.1", 12000)))
+```mbt native
+async fn greeter(registry : @memory.Registry) -> Unit {
+  @async.with_task_group(group => {
+    // A service keeps itself registered for as long as this task runs, and leaves on the way out.
+    group.spawn_bg(() => @moonsd.hold(registry, "greeter", @moonsd.Endpoint::new("10.0.0.1", 12000)))
 
-// A caller follows the service in one task, and reads the list on the request path without waiting.
-let view = @moonsd.View::new()
-group.spawn_bg(() => view.follow(registry, "greeter"))
-view.endpoints()
+    // A caller follows the service in one task, and reads the list on the request path without waiting.
+    let view = @moonsd.View::new()
+    group.spawn_bg(() => view.follow(registry, "greeter"))
+    @async.sleep(50)
+    println(view.endpoints().map(e => e.address()).join(", "))
+  })
+}
 ```
 
 Run `moon run src/examples/tour --target native` for the whole surface in one go.
+
+## Install
+
+```
+moon add moonbitstack/moonsd
+```
+
+Then the client for the registry you run: `moonbitstack/moonredis`, `moonbitstack/moonetcd` or `moonbitstack/moonconsul`.
 
 ## The contract
 
@@ -36,15 +49,19 @@ A watcher gives whole snapshots, not events. A backend that lost its connection 
 
 ## Backends
 
-| Package | Backend |
-|:--:|:--|
-| `moonredis/sd` | Expiring keys, watched by reading again |
-| `moonetcd/sd` | Keys on leases, watched by revision |
+Each backend is a full client for its registry, published as its own module from `drivers/` in this repository; its `sd` package is the part that implements the contract.
+
+| Module | Directory | `sd` package |
+|:--:|:--:|:--|
+| `moonbitstack/moonredis` | [`drivers/redis`](drivers/redis) | Expiring keys, watched by reading again |
+| `moonbitstack/moonetcd` | [`drivers/etcd`](drivers/etcd) | Keys on leases, watched by revision |
+| `moonbitstack/moonconsul` | [`drivers/consul`](drivers/consul) | Services with TTL checks, watched by blocking queries |
 
 ## Writing a backend
 
 Implement `Registrar` and `Discovery`, and call `check` from your tests against a real server:
 
+<!-- nocheck -->
 ```moonbit
 async test "my backend keeps the contract" {
   let backend = connect()

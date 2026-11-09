@@ -4,7 +4,7 @@ version = "0.1.3"
 
 readme = "README.md"
 
-repository = "https://github.com/moonbitstack/moonetcd"
+repository = "https://github.com/moonbitstack/moonsd"
 
 license = "Apache-2.0"
 

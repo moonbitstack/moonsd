@@ -110,7 +110,15 @@ async test "an event fires and lists" {
   let name = stamped("event")
   let (fired, _) = c.event().fire(name, b"hi")
   assert_true(fired.id.length() > 0)
-  let (listed, _) = c.event().list(options={ name: Some(name), })
+  // The agent learns of its own event over gossip, so the first list can come back empty.
+  let mut listed = []
+  for _ in 0..<100 {
+    listed = c.event().list(options={ name: Some(name), }).0
+    if listed.length() > 0 {
+      break
+    }
+    @async.sleep(50)
+  }
   assert_eq(listed.length(), 1)
   assert_eq(listed[0].payload, Some(b"hi"))
 }

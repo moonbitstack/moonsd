@@ -1,19 +1,51 @@
 name: Release
 
-# A version tag publishes this module to mooncakes under the moonbitstack account. Publishing is
+# A version tag publishes one module to mooncakes under the moonbitstack account. Publishing is
 # opt-in: the publish job runs only while the organization (or repository) variable
 # MOONCAKES_PUBLISH is 'true', so a tag with the switch off only runs the tests.
+#
+# moonsd holds four modules; the tag prefix names the one to publish (moonsd-v*,
+# moonredis-v*, moonetcd-v*, moonconsul-v*).
 on:
   push:
-    tags: ["v*"]
+    tags: ["moonsd-v*", "moonredis-v*", "moonetcd-v*", "moonconsul-v*"]
   workflow_dispatch:
+    inputs:
+      module:
+        description: module to publish
+        required: true
+        type: choice
+        options: [moonsd, moonredis, moonetcd, moonconsul]
 
 permissions:
   contents: read
 
 jobs:
-  test:
+  resolve:
     runs-on: ubuntu-26.04
+    outputs:
+      dir: ${{ steps.pick.outputs.dir }}
+    steps:
+      - id: pick
+        env:
+          MODULE: ${{ inputs.module }}
+        run: |
+          name="${MODULE:-${GITHUB_REF_NAME%-v*}}"
+          case "$name" in
+            moonsd) dir=. ;;
+            moonredis) dir=drivers/redis ;;
+            moonetcd) dir=drivers/etcd ;;
+            moonconsul) dir=drivers/consul ;;
+            *) echo "::error::unknown module $name"; exit 1 ;;
+          esac
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+
+  test:
+    needs: resolve
+    runs-on: ubuntu-26.04
+    defaults:
+      run:
+        working-directory: ${{ needs.resolve.outputs.dir }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -27,14 +59,17 @@ jobs:
       - name: test
         run: |
           moon update
-          moon check --target all
+          moon check --target all --deny-warn
           moon test --target all
 
   publish:
-    needs: test
+    needs: [resolve, test]
     if: vars.MOONCAKES_PUBLISH == 'true'
     runs-on: ubuntu-26.04
     environment: mooncakes
+    defaults:
+      run:
+        working-directory: ${{ needs.resolve.outputs.dir }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -76,3 +111,35 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             https://api.github.com/repos/moonbitstack/moonbitstack.github.io/dispatches \
             -d '{"event_type":"released"}'
+
+  # Its own job: the module is already out by now, so rerunning a failure here must not publish it again.
+  # Each module carries its own skill under its own directory, at its own version.
+  skills:
+    needs: [resolve, publish]
+    runs-on: ubuntu-26.04
+    environment: mooncakes
+    defaults:
+      run:
+        working-directory: ${{ needs.resolve.outputs.dir }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: install moonbit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - name: publish the skills, at the module's version
+        env:
+          CREDENTIALS: ${{ secrets.MOONCAKES_CREDENTIALS }}
+        run: |
+          version="$(sed -n 's/^version = "\(.*\)"/\1/p' moon.mod)"
+          trap 'rm -f ~/.moon/credentials.json' EXIT
+          printf '%s' "$CREDENTIALS" > ~/.moon/credentials.json
+          moon update
+          for dir in docs/skills/*/; do
+            [ -f "$dir/SKILL.md" ] || continue
+            moonx moonbit-community/skills --moon-home "$HOME/.moon" publish "$dir" --version "$version"
+          done

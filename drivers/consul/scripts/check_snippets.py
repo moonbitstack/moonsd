@@ -16,6 +16,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+# In a workspace the dependencies are fetched once, next to moon.work, not beside each module.
+CAKES = next((p / ".mooncakes" for p in (ROOT, *ROOT.parents) if (p / ".mooncakes").is_dir()), ROOT / ".mooncakes")
 FENCE = re.compile(r"(<!--\s*nocheck\s*-->[ \t]*\n)?```(mbt|moonbit)([^\n]*)\n(.*?)^```", re.S | re.M)
 TOP = re.compile(r"^(pub(\([a-z]+\))? |priv |fn |async fn |test |async test |struct |enum |suberror |impl |trait |typealias |type |extern |#[a-z])", re.M)
 NAMED = re.compile(r"^(?:pub(?:\([a-z]+\))? )?(?:async )?fn ([A-Za-z_][A-Za-z0-9_]*)", re.M)
@@ -42,7 +44,7 @@ def packages(module, src, deps):
         found.setdefault(path.rsplit("/", 1)[-1], path)
     for dep in deps:
         found.setdefault(dep.rsplit("/", 1)[-1], dep)
-        root = ROOT / ".mooncakes" / dep
+        root = CAKES / dep
         if root.is_dir():
             mod = (root / "moon.mod").read_text(encoding="utf-8") if (root / "moon.mod").exists() else ""
             m = re.search(r'source\s*=\s*"([^"]+)"', mod)
