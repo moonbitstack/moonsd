@@ -13,12 +13,22 @@ keywords = [
   "discovery",
   "registry",
   "service-registry",
+  "register",
+  "lease",
+  "watcher",
+  "endpoint",
+  "microservices",
+  "backend",
+  "redis",
+  "etcd",
+  "consul",
   "conformance",
   "in-memory",
+  "async",
   "moonbit",
 ]
 
-description = "Service discovery for MoonBit: the contract backends implement, with one in-memory registry and a conformance suite."
+description = "Service discovery for MoonBit: the contract a registry implements, an in-process registry, a conformance suite, and clients for Redis, etcd and Consul."
 
 import {
   "moonbitlang/async@0.22.5",
