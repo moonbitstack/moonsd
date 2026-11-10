@@ -33,9 +33,10 @@ Code written against `&Registrar` and `&Discovery` runs on any of them, and on
 
 ## Keep an endpoint registered
 
-`hold` registers the endpoint, renews it at a third of `ttl`, and deregisters it
-when its task is cancelled. A backend that goes away does not end it: the error
-goes to `report`, and the endpoint registers again once the backend is back.
+`hold` registers the endpoint, renews it every `renew_after(ttl)` milliseconds
+— a third of the lease — and deregisters it when its task is cancelled. A backend
+that goes away does not end it: the error goes to `report`, and the endpoint
+registers again once the backend is back.
 
 ```mbt native
 async fn serve(registry : &@moonsd.Registrar) -> Unit {
@@ -109,6 +110,11 @@ async test "my backend keeps the contract" {
 - An unknown service resolves to an empty list, not an error.
 - `ttl`, `retry` and `settle` are milliseconds; the presets are the public
   values `@moonsd.ttl`, `@moonsd.retry` and `@conformance.settle`.
+- `@moonsd.renew_after(ttl)` is the interval `hold` renews on. Use it to size a
+  registry's write load, and never renew at the full `ttl`: one lost renewal would
+  end the lease.
+- A backend whose leases never end by themselves passes
+  `@conformance.check(..., expiry=false)`.
 - `conformance.check` waits up to `settle` for a change to show, so an
   eventually consistent backend passes; pass `expiry=false` for a backend whose
   leases never end.
