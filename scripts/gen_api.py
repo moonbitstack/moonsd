@@ -10,6 +10,9 @@
 #   moon info --target js                     # in the root and each drivers/*
 #   moon info --target native                 # the transports that only build there
 #   python3 scripts/gen_api.py                # write the page and the numbers
+#
+# The shell it fills is `scripts/api.template.html`: the generator's input lives with
+# the generator, so the published site holds only pages a reader can open.
 #   python3 scripts/gen_api.py --check        # exit 1 if either is stale
 #
 # A package that only builds on one backend has no canonical `pkg.generated.mbti`
@@ -423,7 +426,7 @@ def fill_numbers(files, total, packages, per_module):
 def main():
     check = "--check" in sys.argv
     nav, sections, total, packages, per_module = build()
-    with open(os.path.join(ROOT, "docs/api.template.html"), encoding="utf-8") as fh:
+    with open(os.path.join(ROOT, "scripts/api.template.html"), encoding="utf-8") as fh:
         shell = fh.read()
     page = (
         shell.replace("{NAV}", nav)
