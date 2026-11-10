@@ -1,0 +1,88 @@
+name: Docs
+
+# The site is one page per thing: the contract, its guide, a live register, the
+# reference, and a page for each backend. The engine the pages run is built here,
+# never committed; the reference and the numbers on the front pages are generated
+# here, and a diff means the pages are stale.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "docs/**"
+      - "src/**"
+      - "drivers/**"
+      - "scripts/**"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: install moon
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - name: fetch the registry index
+        run: |
+          moon version --all
+          moon update
+
+      - name: interfaces for every package the reference lists
+        # `moon info` writes the canonical interface of a package; a package that
+        # only builds on one backend has none, and is read from that backend's
+        # check output instead.
+        run: |
+          moon info --target js
+          moon info --target native
+          for m in drivers/redis drivers/etcd drivers/consul; do
+            (cd "$m" && moon update && moon info --target js && moon info --target native)
+          done
+
+      - name: generate the reference and the numbers
+        run: python3 scripts/gen_api.py
+
+      - name: the generated pages are what is committed
+        run: git diff --exit-code -- docs/api.html docs/index.html
+
+      - name: build the engine the pages run
+        run: |
+          moon build --target js --release src/examples/browser
+          mkdir -p docs/engine
+          cp _build/js/release/build/moonbitstack/moonsd/examples/browser/browser.js docs/engine/moonsd.js
+
+      - name: configure pages
+        uses: actions/configure-pages@v6
+        with:
+          enablement: true
+
+      - name: upload the site
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-26.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: deploy to github pages
+        id: deployment
+        uses: actions/deploy-pages@v5
