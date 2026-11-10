@@ -1,0 +1,26 @@
+pkgtype(kind: "executable")
+
+supported_targets = "js"
+
+import {
+  "moonbitstack/moonsd",
+  "moonbitstack/moonsd/memory",
+  "moonbitlang/async",
+  "moonbitlang/async/aqueue",
+}
+
+options(
+  link: {
+    "js": {
+      "exports": [
+        "ready",
+        "join",
+        "lease_manually",
+        "renew",
+        "withdraw",
+        "reset",
+        "state",
+      ],
+    },
+  },
+)
