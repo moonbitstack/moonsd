@@ -1,14 +1,17 @@
-"""Compile every MoonBit block in README.md and docs/skills/*/SKILL.md against this module's source.
+"""Compile every MoonBit block in the README, the skills and the documentation pages.
 
 A reader pastes these blocks into a project, so each one has to compile as written. The blocks of
 one file are read in order, the way the page reads: a block may use a name that an earlier block of
 the same file defined. `<!-- nocheck -->` on the line above a block skips it; a block opened with
-```` ```mbt native ```` is checked on the native target only.
+```` ```mbt native ```` is checked on the native target only. A page in `docs/` marks the blocks it
+wants checked with `<pre data-check="mbt">`; the highlighting spans inside are dropped before the
+code is compiled, so what is checked is what the page shows.
 
 Usage: python scripts/check_snippets.py [--moon moon] [file ...]
 """
 
 import argparse
+import html
 import re
 import shutil
 import subprocess
@@ -19,6 +22,8 @@ ROOT = Path(__file__).resolve().parent.parent
 # In a workspace the dependencies are fetched once, next to moon.work, not beside each module.
 CAKES = next((p / ".mooncakes" for p in (ROOT, *ROOT.parents) if (p / ".mooncakes").is_dir()), ROOT / ".mooncakes")
 FENCE = re.compile(r"(<!--\s*nocheck\s*-->[ \t]*\n)?```(mbt|moonbit)([^\n]*)\n(.*?)^```", re.S | re.M)
+PAGE_BLOCK = re.compile(r'<pre[^>]*data-check="mbt([^"]*)"[^>]*>(.*?)</pre>', re.S)
+TAG = re.compile(r"<[^>]+>")
 TOP = re.compile(r"^(pub(\([a-z]+\))? |priv |fn |async fn |test |async test |struct |enum |suberror |impl |trait |typealias |type |extern |#[a-z])", re.M)
 NAMED = re.compile(r"^(?:pub(?:\([a-z]+\))? )?(?:async )?fn ([A-Za-z_][A-Za-z0-9_]*)", re.M)
 CORE = {"array", "bench", "bigint", "buffer", "builtin", "bytes", "char", "cmp", "coverage", "deque", "double", "encoding", "env", "error", "float", "hashmap", "hashset", "immut", "int", "int16", "int64", "json", "list", "math", "option", "queue", "quickcheck", "random", "rational", "ref", "result", "set", "sorted_map", "sorted_set", "strconv", "string", "test", "tuple", "uint", "uint16", "uint64", "unit"}
@@ -56,7 +61,21 @@ def packages(module, src, deps):
     return found
 
 
+def page_blocks(path):
+    """The blocks a documentation page asked to have checked, without their markup."""
+    text = path.read_text(encoding="utf-8")
+    for m in PAGE_BLOCK.finditer(text):
+        if "nocheck" in m.group(1):
+            continue
+        code = html.unescape(TAG.sub("", m.group(2)))
+        code = code.strip("\n") + "\n"
+        yield text[: m.start(2)].count("\n") + 1, "native" in m.group(1), code
+
+
 def blocks(path):
+    if path.suffix in (".html", ".htm"):
+        yield from page_blocks(path)
+        return
     text = path.read_text(encoding="utf-8")
     for m in FENCE.finditer(text):
         if m.group(1) or "nocheck" in m.group(3):
@@ -97,7 +116,11 @@ def main():
         return 0
     subprocess.run([args.moon, "update"], cwd=ROOT, capture_output=True)
     aliases = packages(module, src, deps)
-    files = [Path(f) for f in args.files] or [ROOT / "README.md", *sorted((ROOT / "docs" / "skills").glob("*/SKILL.md"))]
+    files = [Path(f) for f in args.files] or [
+        ROOT / "README.md",
+        *sorted((ROOT / "docs" / "skills").glob("*/SKILL.md")),
+        *sorted((ROOT / "docs").glob("*.html")),
+    ]
     failed = 0
     for file in files:
         file = file if file.is_absolute() else ROOT / file

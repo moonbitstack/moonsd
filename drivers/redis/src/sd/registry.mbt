@@ -9,8 +9,8 @@
 pub let prefix : String = "moonsd"
 
 ///|
-/// How often a watcher looks, in milliseconds: go-zero's discovery reads Redis on the same
-/// order, and a change is at worst this late.
+/// How often a watcher looks, in milliseconds: with no change feed to subscribe to, a change is
+/// at worst this late.
 pub let poll : Int32 = 1000
 
 ///|

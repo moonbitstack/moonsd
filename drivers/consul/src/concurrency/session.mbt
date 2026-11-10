@@ -42,7 +42,7 @@ fn millis_of(text : String) -> Int32 raise @moonconsul.Refused {
 
 ///|
 /// Keep session `id` alive until the task is cancelled, renewing at half of `ttl` milliseconds
-/// and following the TTL the agent answers with, as Go's `RenewPeriodic` does.
+/// and following the TTL the agent answers with.
 ///
 /// A failed renewal is tried again each second until `ttl` has passed since the last good one,
 /// and then raised. A session the agent no longer knows raises `NotFound`.
@@ -128,7 +128,7 @@ async fn Owner::close(self : Owner) -> Unit raise @moonconsul.Refused {
 ///|
 /// Follow a hold until `look`, a read blocking from an index, answers `None`, then raise
 /// `Conflict` with `what`. An unreachable agent is ridden out `retries` times in a row, `retry`
-/// milliseconds apart, as Go's `MonitorRetries` and `MonitorRetryTime`.
+/// milliseconds apart.
 async fn monitor(
   what : String,
   retries : Int32,

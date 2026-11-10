@@ -37,7 +37,7 @@ pub async fn Client::hsetnx(
 
 ///|
 /// `HMSET key field value...`: set several fields atomically. Deprecated in favour of
-/// `HSET` but kept for parity with redis-py.
+/// `HSET`, kept because servers still answer it and callers still send it.
 pub async fn Client::hmset(
   self : Client,
   key : String,

@@ -16,7 +16,7 @@ fn next_index(last : UInt64, seen : UInt64) -> UInt64 {
 
 ///|
 /// How long to wait after `failures` failures in a row: `retry` times the square of that, up to
-/// `limit`, as Go's `watch.Plan` does.
+/// `limit`.
 fn backoff(failures : Int32, retry : Int32, limit : Int32) -> Int32 {
   let wait = retry.to_int64() * failures.to_int64() * failures.to_int64()
   if wait > limit.to_int64() {

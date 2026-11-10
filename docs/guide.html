@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>moonsd — Guide</title>
+  <meta name="description" content="How to register a service, keep it registered, read its endpoints on the request path, and write a backend that keeps the contract.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/register.css">
+  <script>try{var t=sessionStorage.getItem("moonsd-theme");if(!t){t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="index.html">
+    <svg class="glyph" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <rect x="1" y="1" width="30" height="30" stroke="currentColor" stroke-width="1.5"/>
+      <rect x="6" y="8" width="20" height="3.5" fill="currentColor"/>
+      <rect x="6" y="14" width="13" height="3.5" fill="currentColor"/>
+      <rect x="6" y="20" width="9" height="3.5" fill="#BE4227"/>
+    </svg>
+    <span class="name">moonsd</span>
+    <span class="what">service discovery</span>
+  </a>
+  <nav class="nav">
+    <a href="index.html">Home</a>
+    <a href="guide.html" aria-current="page">Guide</a>
+    <a href="api.html">API</a>
+    <a href="demo.html">Demo</a>
+    <a href="https://github.com/moonbitstack/moonsd" rel="noopener">GitHub</a>
+  </nav>
+  <div class="theme" id="theme" role="group" aria-label="Colour theme">
+    <button type="button" data-set-theme="light">Light</button>
+    <button type="button" data-set-theme="dark">Dark</button>
+  </div>
+</header>
+
+<div class="sheet">
+  <div class="docgrid" style="padding-top:var(--s8)">
+    <aside class="side" aria-label="Contents">
+      <div class="grp">Start</div>
+      <a href="#install">Install</a>
+      <a href="#first">The first registration</a>
+      <a href="#hold">Keep it alive</a>
+      <div class="grp">Read</div>
+      <a href="#read">On the request path</a>
+      <a href="#watch">The watcher itself</a>
+      <div class="grp">Build</div>
+      <a href="#backend">Write a backend</a>
+      <a href="#check">Prove it</a>
+      <a href="#run">Run it on a real registry</a>
+      <div class="grp">Live with it</div>
+      <a href="#expire">When a lease ends</a>
+      <a href="#limits">What is not here</a>
+    </aside>
+
+    <main>
+      <section class="section" id="install">
+        <div class="eyebrow"><span class="folio">§1</span><span class="folio">Install</span></div>
+        <h2>Two lines, no server</h2>
+        <p>The contract is one module. The registry in this process is part of it, so the first
+          example runs anywhere, including a test:</p>
+<pre class="sh">moon add moonbitstack/moonsd</pre>
+        <p>Then add the client for the registry you actually run. Each is a full client for that
+          server, with an <code class="inline">sd</code> package that implements the contract:</p>
+        <div class="tbl">
+          <table>
+            <thead><tr><th>Registry</th><th>Module</th><th>Package to import</th></tr></thead>
+            <tbody>
+              <tr><td>in this process</td><td><code>moonbitstack/moonsd</code></td><td><code>moonsd/memory</code></td></tr>
+              <tr><td>Redis</td><td><code>moonbitstack/moonredis</code></td><td><code>moonredis/sd</code></td></tr>
+              <tr><td>etcd</td><td><code>moonbitstack/moonetcd</code></td><td><code>moonetcd/sd</code></td></tr>
+              <tr><td>Consul</td><td><code>moonbitstack/moonconsul</code></td><td><code>moonconsul/sd</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="margin-top:var(--s4)">Every example below is written against the traits, so the
+          same code runs on all four. Methods are asynchronous: the contract is called from tasks.</p>
+      </section>
+
+      <section class="section" id="first">
+        <div class="eyebrow"><span class="folio">§2</span><span class="folio">The first registration</span></div>
+        <h2>An endpoint, a service, a lease</h2>
+        <p>An <code class="inline">Endpoint</code> is an address, a weight and whatever metadata the
+          caller wants carried through. Its id is the address unless you give one. Registering it
+          returns a <code class="inline">Lease</code>: the handle you renew or give back.</p>
+<pre data-check="mbt"><span class="k">async fn</span> announce(registry : &amp;@moonsd.Registrar) -&gt; Unit {
+  <span class="k">let</span> endpoint = @moonsd.Endpoint::new("10.0.0.11", 12000, weight=2, metadata=Map([("zone", "a")]))
+  <span class="k">let</span> lease = registry.register("greeter", endpoint, 15_000)
+  println(lease.service + " " + lease.endpoint.address() + " for " + lease.ttl.to_string() + " ms")
+}</pre>
+        <p>The same call on the in-process registry, and the list it can be read back from:</p>
+<pre data-check="mbt"><span class="k">async fn</span> in_memory() -&gt; Unit {
+  <span class="k">let</span> registry = @memory.Registry::new()
+  <span class="k">let</span> lease = registry.register("greeter", @moonsd.Endpoint::new("10.0.0.11", 12000), 15_000)
+  <span class="k">let</span> found = registry.resolve("greeter")
+  println(found.length().to_string() + " endpoints, revision " + registry.revision().to_string())
+  registry.deregister(lease)
+  println(registry.resolve("greeter").length().to_string() + " endpoints")
+}</pre>
+        <p>Three states matter and they are all ordinary: an unknown service resolves to an empty
+          list, a lease the registry has let go is refused by <code class="inline">renew</code>, and
+          removing a lease twice is harmless.</p>
+      </section>
+
+      <section class="section" id="hold">
+        <div class="eyebrow"><span class="folio">§3</span><span class="folio">Keep it alive</span></div>
+        <h2><code class="inline">hold</code> renews, so you do not</h2>
+        <p>A registration is only good for its lease. <code class="inline">hold</code> keeps it
+          current: it registers, renews every <code class="inline">renew_after(ttl)</code> — a third
+          of the lease — and deregisters when its task is cancelled. It also rides out a registry
+          that has gone away: the error goes to <code class="inline">report</code>, and the endpoint
+          registers again when the registry is back.</p>
+<pre data-check="mbt"><span class="k">async fn</span> serve(registry : &amp;@moonsd.Registrar) -&gt; Unit {
+  <span class="k">let</span> endpoint = @moonsd.Endpoint::new("10.0.0.11", 12000)
+  @async.with_task_group(group =&gt; {
+    group.spawn_bg(() =&gt;
+      @moonsd.hold(registry, "greeter", endpoint, ttl=15_000, report=e =&gt; println(e.to_string()))
+    )
+    <span class="c">// serve here; leaving the group cancels hold, which deregisters</span>
+  })
+}</pre>
+        <p>The first <code class="inline">register</code> is different from every later one: if it
+          fails, nothing has been announced and the caller hears it. After that a failure means the
+          registry is unreachable, which is no reason to stop serving.</p>
+      </section>
+
+      <section class="section" id="read">
+        <div class="eyebrow"><span class="folio">§4</span><span class="folio">On the request path</span></div>
+        <h2><code class="inline">View</code> reads without waiting</h2>
+        <p>Choosing an endpoint must not cost a round trip. One task follows the service and writes
+          what it hears into a <code class="inline">View</code>; every request reads the latest list
+          from memory. When a watcher fails the view keeps what it last heard — a stale list beats
+          none — and watches again after <code class="inline">retry</code> milliseconds.</p>
+<pre data-check="mbt">async fn pick(discovery : &amp;@moonsd.Discovery) -&gt; Unit {
+  <span class="k">let</span> view = @moonsd.View::new()
+  @async.with_task_group(group =&gt; {
+    group.spawn_bg(() =&gt; view.follow(discovery, "greeter"))
+    @async.sleep(50)
+    let addresses = view.endpoints().map(e =&gt; e.address())
+    println(addresses.join(", ") + " at revision " + view.revision().to_string())
+  })
+}</pre>
+        <p>The revision is worth keeping: it grows with every change a registry can number, so a
+          caller can tell two lists apart without comparing them.</p>
+      </section>
+
+      <section class="section" id="watch">
+        <div class="eyebrow"><span class="folio">§5</span><span class="folio">The watcher itself</span></div>
+        <h2>Whole snapshots, never events</h2>
+        <p>A <code class="inline">Watcher</code> hands over the service as it stands, then waits.
+          Every later <code class="inline">next</code> is another whole snapshot; there are no
+          deltas to apply and no reconnect to handle at the call site. That is what lets a caller
+          treat three very different registries the same way.</p>
+<pre data-check="mbt">async fn follow_once(discovery : &amp;@moonsd.Discovery) -&gt; Unit {
+  let watcher = discovery.watch("greeter")
+  <span class="k">defer</span> watcher.close()
+  <span class="k">for</span> _ in 0..&lt;2 {
+    let update = watcher.next()
+    println("revision " + update.revision.to_string() + ": " + update.endpoints.length().to_string())
+  }
+}</pre>
+        <p>Read <code class="inline">View::follow</code> in the source if you want the whole pattern:
+          watch, write, retry. It is twenty lines and it is the same twenty for every backend.</p>
+      </section>
+
+      <section class="section" id="backend">
+        <div class="eyebrow"><span class="folio">§6</span><span class="folio">Write a backend</span></div>
+        <h2>Six methods and a watcher</h2>
+        <p>Implement <code class="inline">Registrar</code> — register, renew, deregister — and
+          <code class="inline">Discovery</code> — resolve, watch — plus a <code class="inline">Watcher</code>
+          with next and close. That is the whole surface. <code class="inline">hold</code>,
+          <code class="inline">View</code> and every framework built on the traits work with it
+          unchanged.</p>
+        <p>The smallest honest backend is a map with a watcher that looks at it on an interval.
+          This one is complete enough to pass the suite below:</p>
+<pre data-check="mbt">struct Slots {
+  kept : Map[String, Array[@moonsd.Endpoint]]
+}
+
+impl @moonsd.Registrar for Slots with fn register(self, service, endpoint, ttl) {
+  <span class="k">let</span> list = self.kept.get(service).unwrap_or([]).filter(e =&gt; e.id != endpoint.id)
+  list.push(endpoint)
+  self.kept[service] = list
+  { service, endpoint, ttl, token: endpoint.id }
+}
+
+impl @moonsd.Registrar for Slots with fn renew(self, lease) {
+  match self.kept.get(lease.service) {
+    Some(list) if list.any(e =&gt; e.id == lease.endpoint.id) =&gt; ()
+    _ =&gt; <span class="k">raise</span> @moonsd.Refused::Expired(lease)
+  }
+}
+
+impl @moonsd.Registrar for Slots with fn deregister(self, lease) {
+  match self.kept.get(lease.service) {
+    Some(list) =&gt; self.kept[lease.service] = list.filter(e =&gt; e.id != lease.endpoint.id)
+    None =&gt; ()
+  }
+}
+
+impl @moonsd.Discovery for Slots with fn resolve(self, service) {
+  self.kept.get(service).unwrap_or([])
+}
+
+struct SlotWatcher {
+  backend : Slots
+  service : String
+  mut revision : Int64
+}
+
+impl @moonsd.Watcher for SlotWatcher with fn next(self) {
+  <span class="c">// polling, the way a registry with no change feed has to</span>
+  @async.sleep(500)
+  self.revision = self.revision + 1L
+  { endpoints: @moonsd.Discovery::resolve(self.backend, self.service), revision: self.revision }
+}
+
+impl @moonsd.Watcher for SlotWatcher with fn close(_self) {}
+
+impl @moonsd.Discovery for Slots with fn watch(self, service) {
+  ({ backend: self, service, revision: 0L } : SlotWatcher)
+}</pre>
+        <div class="note"><b>Do not lose the endpoint on the way through.</b> The metadata map, the
+          weight and the id travel with the endpoint, and a caller that load-balances reads them.
+          A backend that keeps only host and port passes a smoke test and fails the suite.</div>
+      </section>
+
+      <section class="section" id="check">
+        <div class="eyebrow"><span class="folio">§7</span><span class="folio">Prove it</span></div>
+        <h2>The same suite, every backend</h2>
+        <p><code class="inline">conformance.check</code> runs the behaviours the contract promises
+          against one registrar and one discovery: the round trip, the lease that ends, the watcher
+          that hears an arrival, a departure and an empty service, and the <code class="inline">hold</code>/<code class="inline">View</code>
+          pair on top of them. It waits up to <code class="inline">settle</code> milliseconds for a
+          change to show, so an eventually consistent registry passes.</p>
+<pre data-check="mbt"><span class="k">async test</span> "the slots backend keeps the contract" {
+  <span class="k">let</span> backend : Slots = { kept: Map([]) }
+  @conformance.check(backend, backend, settle=1_500, expiry=false)
+}</pre>
+        <p>Pass <code class="inline">expiry=false</code> for a registry whose leases never end by
+          themselves, as this one does not. Everything the suite registers it also removes, so it
+          can run against a development server.</p>
+      </section>
+
+      <section class="section" id="run">
+        <div class="eyebrow"><span class="folio">§8</span><span class="folio">Run it on a real registry</span></div>
+        <h2>Three constructors, one contract</h2>
+        <p>Each client builds its own connection and hands you a registry. What differs between them
+          is only how the registry keeps time and how a change reaches a watcher.</p>
+        <div class="tbl">
+          <table>
+            <thead><tr><th>Package</th><th>Constructor</th><th>What a lease is</th></tr></thead>
+            <tbody>
+              <tr><td><code>moonredis/sd</code></td><td><code>Registry::new(client, prefix~, poll~)</code></td><td>a key with a ttl, so expiring is the whole lifetime</td></tr>
+              <tr><td><code>moonetcd/sd</code></td><td><code>Registry::new(client, prefix~)</code></td><td>a key attached to a lease, so the key goes with it</td></tr>
+              <tr><td><code>moonconsul/sd</code></td><td><code>Registry::new(client, wait~, reap_after~)</code></td><td>a service with a ttl check, passed in time</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="margin-top:var(--s4)">The three backends have their own pages —
+          <a href="redis.html">Redis</a>, <a href="etcd.html">etcd</a>, <a href="consul.html">Consul</a>
+          — and the <a href="index.html">home page</a> compares how each one keeps time.</p>
+      </section>
+
+      <section class="section" id="expire">
+        <div class="eyebrow"><span class="folio">§9</span><span class="folio">When a lease ends</span></div>
+        <h2>One error worth handling</h2>
+        <p><code class="inline">renew</code> raises <code class="inline">Refused::Expired</code> when
+          the registry no longer holds the lease: the process was paused, the network was gone for
+          longer than the ttl, or someone else took the id. <code class="inline">hold</code> answers
+          it by registering again. A caller renewing by hand should do the same.</p>
+<pre data-check="mbt">async fn keep(registry : &amp;@moonsd.Registrar, service : String, endpoint : @moonsd.Endpoint) -&gt; Unit {
+  <span class="k">let</span> mut lease = registry.register(service, endpoint, 10_000)
+  @async.sleep(100)
+  registry.renew(lease) catch {
+    @moonsd.Refused::Expired(_) =&gt; lease = registry.register(service, endpoint, 10_000)
+    e =&gt; println("the registry said no: " + e.to_string())
+  } noraise {
+    _ =&gt; ()
+  }
+  registry.deregister(lease)
+}</pre>
+        <p>The other variant, <code class="inline">Malformed</code>, is text that is not an endpoint
+          or a snapshot — <code class="inline">Endpoint::parse</code> and
+          <code class="inline">Registry::restore</code> are where you meet it.</p>
+      </section>
+
+      <section class="section" id="limits">
+        <div class="eyebrow"><span class="folio">§10</span><span class="folio">What is not here</span></div>
+        <h2>Choosing an endpoint is somebody else's job</h2>
+        <p>moonsd answers <em>who is here</em>. It does not choose among them, retry a call, or
+          open a connection. Picking an endpoint — round robin, least outstanding, a hash of the
+          request — belongs to the pool that makes the call, and keeping the list fresh is what
+          <code class="inline">View</code> is for. A registry that also load-balanced would have to
+          be replaced whenever the balancing changed.</p>
+        <p>Nor does it speak any registry's protocol. That is the point of the three clients: a
+          backend is a library, not a branch inside this one.</p>
+      </section>
+
+      <div class="cta">
+        <a class="btn signal" href="api.html">The full API</a>
+        <a class="btn" href="demo.html">Watch a register run</a>
+      </div>
+    </main>
+  </div>
+</div>
+
+<footer class="foot">
+  <span>moonsd · Apache-2.0 · the service-discovery contract for MoonBit</span>
+  <span class="page"><b>02</b> / 07</span>
+  <span><a href="https://github.com/moonbitstack/moonsd" rel="noopener">github.com/moonbitstack/moonsd</a></span>
+</footer>
+
+<script src="assets/js/theme.js"></script>
+</body>
+</html>

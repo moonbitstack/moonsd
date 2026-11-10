@@ -171,7 +171,7 @@ pub fn decode_cluster_slots(
 }
 
 ///|
-/// How many redirects one command may follow before giving up; go-redis's `MaxRedirects`.
+/// How many redirects one command may follow before giving up.
 pub let redirect_limit : Int32 = 3
 
 ///|

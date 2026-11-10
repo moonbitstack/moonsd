@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>moonsd — moonetcd, a register on leases</title>
+  <meta name="description" content="moonetcd/sd implements the moonsd contract on etcd: an endpoint is a key on a lease, the revision etcd stamps is where a watcher resumes, and a compaction costs one more read.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/register.css">
+  <script>try{var t=sessionStorage.getItem("moonsd-theme");if(!t){t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="index.html">
+    <svg class="glyph" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <rect x="1" y="1" width="30" height="30" stroke="currentColor" stroke-width="1.5"/>
+      <rect x="6" y="8" width="20" height="3.5" fill="currentColor"/>
+      <rect x="6" y="14" width="13" height="3.5" fill="currentColor"/>
+      <rect x="6" y="20" width="9" height="3.5" fill="#BE4227"/>
+    </svg>
+    <span class="name">moonsd</span>
+    <span class="what">service discovery</span>
+  </a>
+  <nav class="nav">
+    <a href="index.html">Home</a>
+    <a href="guide.html">Guide</a>
+    <a href="api.html">API</a>
+    <a href="demo.html">Demo</a>
+    <a href="https://github.com/moonbitstack/moonsd" rel="noopener">GitHub</a>
+  </nav>
+  <div class="theme" id="theme" role="group" aria-label="Colour theme">
+    <button type="button" data-set-theme="light">Light</button>
+    <button type="button" data-set-theme="dark">Dark</button>
+  </div>
+</header>
+
+<div class="sheet">
+  <section class="band plain hero">
+    <div class="body">
+      <div class="driver-hero">
+        <div>
+          <p class="folio">Backend · etcd</p>
+          <h1 style="margin:var(--s4) 0">moonetcd</h1>
+          <p class="lede">
+            A complete etcd client, and <code class="inline">moonetcd/sd</code>: the contract on keys
+            attached to leases. The key goes when the lease does, and the revision etcd stamps on
+            every write is where a watcher picks up.
+          </p>
+        </div>
+        <div class="record" aria-label="How moonetcd stores an endpoint">
+          <div class="record__row"><span class="record__k">key</span><span class="record__v ">/moonsd/greeter/10.0.0.11:12000</span></div>
+          <div class="record__row"><span class="record__k">value</span><span class="record__v dim">{"host":"10.0.0.11","port":12000}</span></div>
+          <div class="record__row"><span class="record__k">register</span><span class="record__v ">grant(ttl), then put the key on that lease</span></div>
+          <div class="record__row"><span class="record__k">renew</span><span class="record__v ">one keep_alive; a reply with no time left means gone</span></div>
+          <div class="record__row"><span class="record__k">watch</span><span class="record__v dim">resumes from the revision it last saw</span></div>
+          <div class="record__row"><span class="record__k">lapse</span><span class="record__v signal">the lease is revoked or lost, and the key goes with it</span></div>
+          </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="num">i</div>
+    <div class="body">
+      <p class="folio">What it is</p>
+      <h2>A key that cannot outlive its lease</h2>
+      <p style="max-width:66ch;color:var(--ink-soft);margin-top:var(--s4)">
+        etcd already has the two mechanisms a registry needs: keys that vanish with a lease, and a
+        monotonically increasing revision on every write. The registry puts
+        <code class="inline">/moonsd/{service}/{id}</code> on a granted lease and lets etcd do the
+        forgetting. A service name is escaped on the way into the key, so a prefix read of service
+        <code class="inline">a</code> cannot pick up service <code class="inline">a/b</code>.
+      </p>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="num">ii</div>
+    <div class="body">
+      <p class="folio">The lease</p>
+      <h2>Seconds on the wire, a token that is the lease</h2>
+      <div class="articles">
+        <div class="article"><div class="idx">01</div><div><h3>register</h3>
+          <p><code class="inline">lease().grant(seconds)</code> then <code class="inline">kv().put(key, value, lease=id)</code>.
+            A lease lasts whole seconds and the server enforces a minimum, so a millisecond ttl is
+            rounded up rather than down — rounding down would end the lease early.</p></div></div>
+        <div class="article"><div class="idx">02</div><div><h3>renew</h3>
+          <p>One <code class="inline">keep_alive</code> round. etcd answers an acknowledgement with
+            no time left rather than an error when the lease is gone, and that is what becomes
+            <code class="inline">Refused::Expired</code>.</p></div></div>
+        <div class="article"><div class="idx">03</div><div><h3>deregister</h3>
+          <p>Revoking the lease takes every key on it with it, which is why the token can be a
+            string in the contract and still be enough to clean up.</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="num">iii</div>
+    <div class="body">
+      <p class="folio">The watcher</p>
+      <h2>Resume from a revision, recover once</h2>
+      <p style="max-width:66ch;color:var(--ink-soft);margin-top:var(--s4)">
+        The first snapshot is a range read; each later one is a watch from the last revision seen. A
+        connection that drops, or a history that has been compacted past the revision, is answered by
+        reading the whole service once and watching from there — the caller sees another snapshot and
+        nothing else, which is the promise the watcher made.
+      </p>
+      <div class="statusbar" style="margin-top:var(--s6)">
+        <span>prefix <b>/moonsd</b></span>
+        <span>ttl <b>rounded up to seconds</b></span>
+        <span>token <b>the lease id</b></span>
+        <span>verified against <b>etcd 3.5</b>, three nodes, members killed</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="num">iv</div>
+    <div class="body">
+      <p class="folio">The client behind it</p>
+      <h2>Both transports, both directions</h2>
+      <p style="max-width:66ch;color:var(--ink-soft);margin-top:var(--s4)">
+        <code class="inline">sd</code> sits on a client that speaks etcd's gRPC service and its JSON
+        gateway, over TLS with or without a client certificate. KV, watch, lease, cluster, auth,
+        maintenance, lock and election are all there, along with the concurrency helpers built on
+        them, because a service that elects a leader already has the client.
+      </p>
+      <div class="cta">
+        <a class="btn signal" href="https://github.com/moonbitstack/moonsd/tree/master/drivers/etcd" rel="noopener">The client's README</a>
+        <a class="btn" href="index.html">The other registries</a>
+      </div>
+    </div>
+  </section>
+</div>
+
+<footer class="foot">
+  <span>moonsd · Apache-2.0 · the service-discovery contract for MoonBit</span>
+  <span class="page"><b>06</b> / 07</span>
+  <span><a href="https://github.com/moonbitstack/moonsd" rel="noopener">github.com/moonbitstack/moonsd</a></span>
+</footer>
+
+<script src="assets/js/theme.js"></script>
+</body>
+</html>

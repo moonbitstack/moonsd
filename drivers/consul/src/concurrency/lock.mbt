@@ -24,7 +24,7 @@ pub(all) struct LockOptions {
 }
 
 ///|
-/// The defaults of Go's `api.Lock`.
+/// The presets a Consul lock is created with.
 pub let default_lock_options : LockOptions = {
   value: b"",
   session: None,

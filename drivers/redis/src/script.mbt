@@ -1,6 +1,6 @@
 ///|
-/// A Lua script run by its digest, as go-redis's `Script` runs one: loaded on first use, and
-/// loaded again if the server has forgotten it.
+/// A Lua script run by its digest: loaded on first use, and loaded again if the server has
+/// forgotten it.
 pub struct Script {
   source : String
   priv mut digest : String?

@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>moonsd — the register of what is alive</title>
+  <meta name="description" content="moonsd is the service-discovery contract for MoonBit: three traits a registry implements, one in-memory registry, a conformance suite, and client libraries for Redis, etcd and Consul.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/register.css">
+  <script>try{var t=sessionStorage.getItem("moonsd-theme");if(!t){t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="index.html">
+    <svg class="glyph" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <rect x="1" y="1" width="30" height="30" stroke="currentColor" stroke-width="1.5"/>
+      <rect x="6" y="8" width="20" height="3.5" fill="currentColor"/>
+      <rect x="6" y="14" width="13" height="3.5" fill="currentColor"/>
+      <rect x="6" y="20" width="9" height="3.5" fill="#BE4227"/>
+    </svg>
+    <span class="name">moonsd</span>
+    <span class="what">service discovery</span>
+  </a>
+  <nav class="nav">
+    <a href="index.html" aria-current="page">Home</a>
+    <a href="guide.html">Guide</a>
+    <a href="api.html">API</a>
+    <a href="demo.html">Demo</a>
+    <a href="https://github.com/moonbitstack/moonsd" rel="noopener">GitHub</a>
+  </nav>
+  <div class="theme" id="theme" role="group" aria-label="Colour theme">
+    <button type="button" data-set-theme="light">Light</button>
+    <button type="button" data-set-theme="dark">Dark</button>
+  </div>
+</header>
+
+<div class="sheet">
+
+  <!-- 00 · the board -->
+  <section class="band plain hero">
+    <div class="body">
+      <div class="hero__grid">
+        <div>
+          <p class="folio">Service discovery · MoonBit</p>
+          <h1>moonsd</h1>
+          <p class="lede">
+            A service has to say it is here, keep saying it, and be found. moonsd
+            writes that down as <b>three traits</b> — a registrar, a discovery, a
+            watcher — and leaves every registry to implement them.
+          </p>
+          <div class="keys">
+            <span><b data-gen="modules">4</b>modules</span>
+            <span><b data-gen="packages">15</b>packages</span>
+            <span><b data-gen="items">1847</b>public items</span>
+            <span><b>4</b>targets</span>
+          </div>
+        </div>
+
+        <section class="board" data-board aria-label="A live registry, running in this page">
+          <header class="board__head">
+            <span class="lamp" data-lamp aria-hidden="true"></span>
+            <span>the register</span>
+            <span class="rev">rev <b data-rev>0</b> · ttl <b data-ttl>8.0</b>s</span>
+          </header>
+          <div class="board__rows" data-rows></div>
+          <footer class="board__foot">
+            <span data-scale>greeter 0 · checkout 0</span>
+            <span style="margin-left:auto" data-controls>
+              <button class="btn" type="button" data-do="join">Add instance</button>
+              <button class="btn" type="button" data-do="join-manual">New lease</button>
+              <button class="btn" type="button" data-do="reset">Reset</button>
+            </span>
+          </footer>
+        </section>
+      </div>
+
+      <div class="ruler" aria-hidden="true">
+        <span class="cap">lease time · one ttl</span>
+        <span class="major">0</span><span>1</span><span>2</span><span class="major">3</span>
+        <span>4</span><span>5</span><span class="major">6</span><span>7</span><span>8</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 01 · the contract -->
+  <section class="band">
+    <div class="num">01</div>
+    <div class="body">
+      <p class="folio">Article one</p>
+      <h2>Three traits, and nothing about any one registry</h2>
+      <p style="max-width:66ch;color:var(--ink-soft);margin-top:var(--s4)">
+        A registry is a place a service writes its address and a caller reads it back.
+        That is all the contract fixes. What the registry does with a lapsed lease, how
+        a watcher learns of a change, whether the store is a process, a cluster or a
+        key-value server — none of it reaches the caller.
+      </p>
+      <div class="traits">
+        <div class="trait">
+          <span class="roman">i</span>
+          <h3>Registrar</h3>
+          <div class="sig"><b>register</b>(service, endpoint, ttl) → Lease<br><b>renew</b>(lease)<br><b>deregister</b>(lease)</div>
+          <p>An address is known for its lease and no longer. Renewing extends it; a lease
+            the registry has let go raises <code class="inline">Refused::Expired</code>.</p>
+        </div>
+        <div class="trait">
+          <span class="roman">ii</span>
+          <h3>Discovery</h3>
+          <div class="sig"><b>resolve</b>(service) → [Endpoint]<br><b>watch</b>(service) → &amp;Watcher</div>
+          <p>One answer now, or a stream of answers. A service nobody registered has no
+            endpoints; that is not an error.</p>
+        </div>
+        <div class="trait">
+          <span class="roman">iii</span>
+          <h3>Watcher</h3>
+          <div class="sig"><b>next</b>() → Update<br><b>close</b>()</div>
+          <p>Whole snapshots, never events. Reconnecting and recovering from a compacted
+            history are the backend's business, so what comes out is what is true now.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 · the lease -->
+  <section class="band">
+    <div class="num">02</div>
+    <div class="body">
+      <p class="folio">Article two</p>
+      <h2>A lease, and who keeps it</h2>
+      <p style="max-width:62ch;color:var(--ink-soft);margin-top:var(--s4)">
+        An endpoint is alive because something keeps saying so. <code class="inline">hold</code>
+        renews at a third of the lease and registers again when the registry has forgotten it.
+        <code class="inline">View</code> follows a service in one task and hands the latest list to
+        whoever is on the request path, without a round trip.
+      </p>
+
+      <figure class="lease-figure figure">
+        <svg viewBox="0 0 720 132" role="img" aria-label="A lease renewed twice, then lapsing: the endpoint leaves the register when the lease ends">
+          <g font-family="JetBrains Mono, monospace" font-size="9" fill="currentColor" letter-spacing="1">
+            <text x="0" y="16" opacity="0.55">LEASE</text>
+            <text x="640" y="16" opacity="0.55">TIME</text>
+          </g>
+          <!-- the baseline ruler -->
+          <line x1="0" y1="96" x2="720" y2="96" stroke="currentColor" stroke-opacity="0.28" stroke-width="1"/>
+          <g stroke="currentColor" stroke-opacity="0.28">
+            <line x1="0" y1="96" x2="0" y2="104"/><line x1="72" y1="96" x2="72" y2="104"/>
+            <line x1="144" y1="96" x2="144" y2="104"/><line x1="216" y1="96" x2="216" y2="104"/>
+            <line x1="288" y1="96" x2="288" y2="104"/><line x1="360" y1="96" x2="360" y2="104"/>
+            <line x1="432" y1="96" x2="432" y2="104"/><line x1="504" y1="96" x2="504" y2="104"/>
+            <line x1="576" y1="96" x2="576" y2="104"/><line x1="648" y1="96" x2="648" y2="104"/>
+            <line x1="720" y1="96" x2="720" y2="104"/>
+          </g>
+          <!-- a lease held, three times -->
+          <g>
+            <rect x="16" y="46" width="216" height="10" fill="currentColor" opacity="0.92"/>
+            <rect x="232" y="46" width="216" height="10" fill="currentColor" opacity="0.92"/>
+            <rect x="448" y="46" width="152" height="10" fill="currentColor" opacity="0.92"/>
+            <rect x="600" y="46" width="104" height="10" fill="currentColor" opacity="0.18"/>
+            <g stroke="currentColor" stroke-width="1.5" opacity="0.9">
+              <line x1="232" y1="36" x2="232" y2="66"/><line x1="448" y1="36" x2="448" y2="66"/>
+            </g>
+            <g fill="var(--signal)">
+              <rect x="229" y="70" width="6" height="6"/><rect x="445" y="70" width="6" height="6"/>
+              <rect x="597" y="70" width="6" height="6"/>
+            </g>
+            <g font-family="JetBrains Mono, monospace" font-size="10" fill="currentColor">
+              <text x="16" y="34">register</text>
+              <text x="238" y="88" fill="var(--signal)">renew</text>
+              <text x="454" y="88" fill="var(--signal)">renew</text>
+              <text x="604" y="88" fill="var(--signal)">lapse</text>
+            </g>
+          </g>
+          <g font-family="JetBrains Mono, monospace" font-size="10" fill="currentColor" opacity="0.55">
+            <text x="16" y="120">ttl</text>
+            <text x="232" y="120">ttl</text>
+            <text x="448" y="120">ttl</text>
+            <text x="600" y="120">gone</text>
+          </g>
+        </svg>
+        <figcaption>Nobody renewed the third lease, so the endpoint is off the register — and this is the only way an endpoint ever leaves unexpectedly.</figcaption>
+      </figure>
+
+      <div class="prose">
+        <p>
+          Both are written once, against the traits, so a backend gets them by implementing
+          six methods:
+        </p>
+      </div>
+<!-- data-check="mbt" -->
+<pre data-check="mbt"><span class="k">async fn</span> serve(registry : &amp;@moonsd.Registrar) -&gt; Unit {
+  <span class="k">let</span> endpoint = @moonsd.Endpoint::new("10.0.0.1", 12000, metadata=Map([("zone", "a")]))
+  @async.with_task_group(group =&gt; {
+    group.spawn_bg(() =&gt; @moonsd.hold(registry, "greeter", endpoint, ttl=15_000))
+    <span class="c">// serve here; leaving the group cancels hold, which deregisters</span>
+  })
+}</pre>
+    </div>
+  </section>
+
+  <!-- 03 · the modules -->
+  <section class="band">
+    <div class="num">03</div>
+    <div class="body">
+      <p class="folio">Article three</p>
+      <h2>One contract, four modules</h2>
+      <p style="max-width:62ch;color:var(--ink-soft);margin-top:var(--s4)">
+        The contract is a module of its own, and each registry is a client library that
+        implements it — a full client for that registry, with a small <code class="inline">sd</code>
+        package where the client meets the contract.
+      </p>
+      <div class="plates">
+        <article class="plate">
+          <span class="tab">the contract</span>
+          <span class="count"><b data-gen="items:moonsd">55</b> items</span>
+          <h3><svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M4 12h11"/><path d="M4 17h7" stroke="#BE4227"/></svg>moonsd</h3>
+          <p>The three traits, <code class="inline">Endpoint</code>, <code class="inline">Lease</code>,
+            <code class="inline">Update</code>, <code class="inline">hold</code>, <code class="inline">View</code>,
+            an in-process registry and the conformance suite.</p>
+          <div class="path">moonbitstack/moonsd · memory · conformance</div>
+          <a class="go" href="guide.html">read the guide →</a>
+        </article>
+        <article class="plate">
+          <span class="tab">backend</span>
+          <span class="count"><b data-gen="items:moonredis">562</b> items</span>
+          <h3><svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="9" cy="9" r="4"/><path d="M12 12l7 7M15.5 15.5l2-2M17.5 17.5l2-2"/></svg>moonredis</h3>
+          <p>Keys that expire carry the endpoint, so a lapsed lease needs no sweeper. A
+            watcher reads the key set again on an interval.</p>
+          <div class="path">moonbitstack/moonredis · sd</div>
+          <a class="go" href="redis.html">the redis registry →</a>
+        </article>
+        <article class="plate">
+          <span class="tab">backend</span>
+          <span class="count"><b data-gen="items:moonetcd">908</b> items</span>
+          <h3><svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3.5" y="6" width="17" height="12"/><path d="M7.5 12h7M13 9l3 3-3 3"/></svg>moonetcd</h3>
+          <p>Keys on leases, so the key goes when the lease does; the revision etcd stamps
+            on every write is where a watcher resumes.</p>
+          <div class="path">moonbitstack/moonetcd · sd</div>
+          <a class="go" href="etcd.html">the etcd registry →</a>
+        </article>
+        <article class="plate">
+          <span class="tab">backend</span>
+          <span class="count"><b data-gen="items:moonconsul">322</b> items</span>
+          <h3><svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M8.4 12.2l2.4 2.4 4.8-5.2"/></svg>moonconsul</h3>
+          <p>Services with TTL checks, so other Consul clients see ordinary services; a
+            watcher follows them with blocking queries.</p>
+          <div class="path">moonbitstack/moonconsul · sd</div>
+          <a class="go" href="consul.html">the consul registry →</a>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 · held to the same behaviour -->
+  <section class="band">
+    <div class="num">04</div>
+    <div class="body">
+      <p class="folio">Article four</p>
+      <h2>Held to the same behaviour</h2>
+      <p style="max-width:62ch;color:var(--ink-soft);margin-top:var(--s4)">
+        A backend is not finished when it compiles. <code class="inline">conformance.check</code>
+        runs every behaviour the contract promises against one registrar and one discovery:
+        the fields that survive a round trip, the lease that lapses, the watcher that hears a
+        change and then hears the service empty. Each client's suite runs it against the real
+        server, in CI.
+      </p>
+      <div class="tbl" style="margin-top:var(--s5)">
+        <table>
+          <thead>
+            <tr><th>Backend</th><th>Where the endpoint lives</th><th>Lease ends by</th><th>Watcher learns by</th><th>Check</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>memory</code></td><td>a map in this process</td><td>a clock, and the next call that looks</td><td>a queue per follower</td><td>both ways: with and without a clock</td></tr>
+            <tr><td><code>moonredis</code></td><td>a key with a TTL</td><td>Redis expiring the key</td><td>reading the key set again</td><td>live Redis 8, standalone and clustered</td></tr>
+            <tr><td><code>moonetcd</code></td><td>a key attached to a lease</td><td>the lease being revoked or lost</td><td>a watch from the last revision</td><td>live etcd 3.5, three nodes, members killed</td></tr>
+            <tr><td><code>moonconsul</code></td><td>a service with a TTL check</td><td>the check going critical and being reaped</td><td>a blocking query</td><td>live Consul 1.20, two agents</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <div class="band plain">
+    <div class="body">
+      <div class="cta">
+        <a class="btn signal" href="guide.html">Write a service that announces itself</a>
+        <a class="btn" href="api.html">The full API</a>
+        <a class="btn" href="demo.html">Watch a register run</a>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer class="foot">
+  <span>moonsd · Apache-2.0 · the service-discovery contract for MoonBit</span>
+  <span class="page"><b>01</b> / 07</span>
+  <span><a href="https://github.com/moonbitstack/moonsd" rel="noopener">github.com/moonbitstack/moonsd</a></span>
+</footer>
+
+<script src="assets/js/theme.js"></script>
+<script type="module" src="assets/js/board.js"></script>
+</body>
+</html>

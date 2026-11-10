@@ -25,20 +25,17 @@ pub fn protocol_version(protocol : Protocol) -> Int32 {
 /// The pool a client draws connections from: its size bounds, how long an idle
 /// connection lives, and whether a borrowed connection is checked before use.
 pub(all) struct PoolOptions {
-  /// The most idle connections kept ready; the pool drops idle ones past it. 10, as in
-  /// `go-redis`'s `MaxIdle`.
+  /// The most idle connections kept ready; the pool drops idle ones past it. 10.
   max_idle : Int32
-  /// The most connections open at once; 0 means no cap, as `go-redis` defaults
-  /// (`PoolSize`/`MaxActive` 0).
+  /// The most connections open at once; 0 means no cap.
   max_active : Int32
-  /// The fewest connections kept warm, so a burst does not open them all at once. 1, as
-  /// `go-redis`'s `MinIdleConns`.
+  /// The fewest connections kept warm, so a burst does not open them all at once. 1.
   min_idle : Int32
-  /// How long an idle connection is kept before reclaim, in milliseconds. 300000 (5
-  /// minutes), as `go-redis`'s `IdleTimeout`.
+  /// How long an idle connection is kept before reclaim, in milliseconds. 300000, five
+  /// minutes.
   idle_timeout : Int64
-  /// Whether a connection is pinged before it is handed out. True, as `go-redis`'s
-  /// `PoolFIFO` off and a live check on borrow.
+  /// Whether a connection is pinged before it is handed out. True: a connection that a
+  /// server closed while it sat idle would otherwise fail the first command on it.
   health_check : Bool
 }
 
@@ -55,16 +52,14 @@ pub let pool_default : PoolOptions = PoolOptions::{
 /// How a call retries after a transport failure: how many attempts in total, the backoff
 /// between them and how hard it backs off.
 pub(all) struct RetryOptions {
-  /// Total attempts including the first; 3, as `go-redis`'s `MaxRetries`.
+  /// Total attempts including the first; 3.
   attempts : Int32
-  /// The delay before the first retry, in milliseconds. 100, as `go-redis`'s
-  /// `MinRetryBackoff`/`MaxRetryBackoff` meet in the middle.
+  /// The delay before the first retry, in milliseconds. 100.
   base_delay : Int64
-  /// The longest a retry waits, in milliseconds. 2000, as `go-redis`'s
-  /// `MaxRetryBackoff`.
+  /// The longest a retry waits, in milliseconds. 2000.
   max_delay : Int64
   /// The 0-9 aggressiveness of the backoff growth; each step waits `base * level^step`.
-  /// 1 (linear), as `go-redis`'s near-linear backoff.
+  /// 1, which grows linearly.
   level : Int32
   /// Whether to scatter retries by up to a quarter of the delay, so many clients do not
   /// retry in lockstep. True.

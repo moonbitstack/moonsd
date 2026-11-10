@@ -21,7 +21,7 @@ pub(all) struct SemaphoreOptions {
 }
 
 ///|
-/// The defaults of Go's `api.Semaphore`.
+/// The presets a Consul semaphore is created with.
 pub let default_semaphore_options : SemaphoreOptions = {
   value: b"",
   session: None,

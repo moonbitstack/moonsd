@@ -114,8 +114,8 @@ pub fn EventType::to_int(self : EventType) -> Int32 {
 }
 
 ///|
-/// The event type for a protobuf enum number; unknown numbers read as `Put`, as
-/// etcd (and Go's proto) default an unknown enum to its first value.
+/// The event type for a protobuf enum number; an unknown number reads as `Put`, the first
+/// variant, which is what a protobuf decoder does with an unrecognised value.
 pub fn EventType::from_int(n : Int32) -> EventType {
   if n == 1 {
     Delete

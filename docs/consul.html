@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>moonsd — moonconsul, a register of services and checks</title>
+  <meta name="description" content="moonconsul/sd implements the moonsd contract on Consul: the endpoint is an ordinary registered service with a ttl check, and a watcher follows it with blocking queries.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/register.css">
+  <script>try{var t=sessionStorage.getItem("moonsd-theme");if(!t){t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="index.html">
+    <svg class="glyph" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <rect x="1" y="1" width="30" height="30" stroke="currentColor" stroke-width="1.5"/>
+      <rect x="6" y="8" width="20" height="3.5" fill="currentColor"/>
+      <rect x="6" y="14" width="13" height="3.5" fill="currentColor"/>
+      <rect x="6" y="20" width="9" height="3.5" fill="#BE4227"/>
+    </svg>
+    <span class="name">moonsd</span>
+    <span class="what">service discovery</span>
+  </a>
+  <nav class="nav">
+    <a href="index.html">Home</a>
+    <a href="guide.html">Guide</a>
+    <a href="api.html">API</a>
+    <a href="demo.html">Demo</a>
+    <a href="https://github.com/moonbitstack/moonsd" rel="noopener">GitHub</a>
+  </nav>
+  <div class="theme" id="theme" role="group" aria-label="Colour theme">
+    <button type="button" data-set-theme="light">Light</button>
+    <button type="button" data-set-theme="dark">Dark</button>
+  </div>
+</header>
+
+<div class="sheet">
+  <section class="band plain hero">
+    <div class="body">
+      <div class="driver-hero">
+        <div>
+          <p class="folio">Backend · Consul</p>
+          <h1 style="margin:var(--s4) 0">moonconsul</h1>
+          <p class="lede">
+            A complete Consul client, and <code class="inline">moonconsul/sd</code>: the contract as
+            an ordinary Consul service with a ttl check. Other Consul clients see a normal
+            registration; the contract sees a lease.
+          </p>
+        </div>
+        <div class="record" aria-label="How moonconsul stores an endpoint">
+          <div class="record__row"><span class="record__k">service</span><span class="record__v ">greeter at 10.0.0.11:12000</span></div>
+          <div class="record__row"><span class="record__k">id</span><span class="record__v dim">moonsd_id in the service's metadata</span></div>
+          <div class="record__row"><span class="record__k">check</span><span class="record__v ">service:greeter:10.0.0.11:12000, ttl</span></div>
+          <div class="record__row"><span class="record__k">renew</span><span class="record__v ">check_pass</span></div>
+          <div class="record__row"><span class="record__k">watch</span><span class="record__v dim">a blocking query on the health index, wait 30 s</span></div>
+          <div class="record__row"><span class="record__k">lapse</span><span class="record__v signal">the check goes critical; the agent reaps it after reap_after</span></div>
+          </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="num">i</div>
+    <div class="body">
+      <p class="folio">What it is</p>
+      <h2>The registration is a Consul registration</h2>
+      <p style="max-width:66ch;color:var(--ink-soft);margin-top:var(--s4)">
+        Consul's own fields carry the endpoint — address, port, tags, metadata — so an operator
+        looking at the catalogue sees what they expect, and a client written in any language finds the
+        service. The contract's id travels in metadata under <code class="inline">moonsd_id</code>,
+        because Consul's service id has to be unique per agent and the contract only requires it to be
+        unique per service.
+      </p>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="num">ii</div>
+    <div class="body">
+      <p class="folio">The lease</p>
+      <h2>Renewing is passing the check</h2>
+      <div class="articles">
+        <div class="article"><div class="idx">01</div><div><h3>register</h3>
+          <p>A service registration with a ttl check named after it. The token in the lease is
+            <code class="inline">{service}:{id}</code>, which is enough to find the check again.</p></div></div>
+        <div class="article"><div class="idx">02</div><div><h3>renew</h3>
+          <p><code class="inline">agent().check_pass(check_id)</code>. A check that goes critical
+            takes the instance out of <code class="inline">resolve</code> at once; Consul reaps the
+            registration a minute later, which is only how long the corpse stays on the agent.</p></div></div>
+        <div class="article"><div class="idx">03</div><div><h3>deregister</h3>
+          <p>The service is deregistered with its check, and a registration that has already been
+            reaped is answered as success rather than as an error.</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="num">iii</div>
+    <div class="body">
+      <p class="folio">The watcher</p>
+      <h2>Wait on an index, not on a timer</h2>
+      <p style="max-width:66ch;color:var(--ink-soft);margin-top:var(--s4)">
+        A health query takes <code class="inline">wait_index</code> and <code class="inline">wait_time</code>:
+        the agent holds the request until the answer changes or the wait runs out, and returns the
+        index that produced it. The watcher feeds that index into the next query, so a change arrives
+        as soon as the agent knows it, and a quiet service costs one idle request every
+        <code class="inline">wait</code> — thirty seconds, which is long enough not to be a poll and
+        short enough that closing the watcher is noticed promptly.
+      </p>
+      <div class="statusbar" style="margin-top:var(--s6)">
+        <span>wait <b>30 s</b></span>
+        <span>reap after <b>1 m</b></span>
+        <span>token <b>{service}:{id}</b></span>
+        <span>verified against <b>Consul 1.20</b>, two agents</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="num">iv</div>
+    <div class="body">
+      <p class="folio">The client behind it</p>
+      <h2>More than health checks</h2>
+      <p style="max-width:66ch;color:var(--ink-soft);margin-top:var(--s4)">
+        The client covers the API a deployment actually uses: agent, catalog, health, kv, sessions,
+        events, ACLs, status, coordinates, prepared queries, config entries, Connect and its CA, plus
+        locks and semaphores built on sessions. Blocking queries are a first-class primitive, with a
+        watch loop that retries on backoff when an agent goes away.
+      </p>
+      <div class="cta">
+        <a class="btn signal" href="https://github.com/moonbitstack/moonsd/tree/master/drivers/consul" rel="noopener">The client's README</a>
+        <a class="btn" href="index.html">The other registries</a>
+      </div>
+    </div>
+  </section>
+</div>
+
+<footer class="foot">
+  <span>moonsd · Apache-2.0 · the service-discovery contract for MoonBit</span>
+  <span class="page"><b>07</b> / 07</span>
+  <span><a href="https://github.com/moonbitstack/moonsd" rel="noopener">github.com/moonbitstack/moonsd</a></span>
+</footer>
+
+<script src="assets/js/theme.js"></script>
+</body>
+</html>
