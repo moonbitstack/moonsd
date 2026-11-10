@@ -9,9 +9,22 @@
 pub let retry : Int32 = 1000
 
 ///|
+/// How long `hold` waits between two renewals of a lease of `ttl` milliseconds: a third, the
+/// interval a lease needs to survive two lost renewals. Never zero, so a tiny `ttl` does not
+/// turn the loop into a spin.
+pub fn renew_after(ttl : Int32) -> Int32 {
+  let third = ttl / 3
+  if third < 1 {
+    1
+  } else {
+    third
+  }
+}
+
+///|
 /// Keep `endpoint` registered under `service` until the task is cancelled, then remove it.
 ///
-/// It renews at a third of `ttl`, the interval etcd's own keep-alive uses. The first `register`
+/// It renews every `renew_after(ttl)` milliseconds, a third of the lease. The first `register`
 /// failing is raised: nothing has been announced, and the caller should hear. After that a
 /// failure is a backend that went away, which is no reason to stop serving: it goes to `report`
 /// and the next round registers again, so the endpoint comes back with the backend.
@@ -32,7 +45,7 @@ pub async fn hold(
     })
   })
   for ;; {
-    @async.sleep(ttl / 3)
+    @async.sleep(renew_after(ttl))
     match lease {
       Some(held) =>
         registrar.renew(held) catch {

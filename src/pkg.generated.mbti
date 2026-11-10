@@ -9,6 +9,8 @@ import {
 // Values
 pub async fn hold(&Registrar, String, Endpoint, ttl? : Int32, report? : (Error) -> Unit) -> Unit
 
+pub fn renew_after(Int32) -> Int32
+
 pub let retry : Int32
 
 pub let ttl : Int32

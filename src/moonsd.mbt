@@ -6,8 +6,9 @@
 pub let weight : Int32 = 1
 
 ///|
-/// How long a registration lasts without being renewed, in milliseconds: go-zero's `discov`
-/// default of ten seconds.
+/// How long a registration lasts without being renewed, in milliseconds. Ten seconds is the
+/// interval a registry conventionally uses: long enough that one lost renewal is not fatal, short
+/// enough that an instance which died is noticed quickly.
 pub let ttl : Int32 = 10000
 
 ///|
