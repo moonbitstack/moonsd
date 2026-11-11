@@ -121,6 +121,8 @@
   padding: 7px var(--s4);
   font-family: var(--font-mono); font-size: 12px;
   border-left: 2px solid transparent;
+  /* a lease that runs out is a row going quiet, not a row being switched off */
+  transition: opacity var(--t2) var(--ease);
 }
 /* a row is admitted once, when it arrives; a board that replays this on every poll
    would read as a fault */
