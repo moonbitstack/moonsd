@@ -255,8 +255,10 @@ async fn World::clear(self : World) -> Unit {
 }
 
 ///|
-/// Start the board with the fleet it opens with: two greeters, one of them kept
-/// alive by `hold` and one the page renews, and a checkout kept alive by `hold`.
+/// Start the board with the fleet it opens with: two greeters and a checkout, all
+/// kept alive by `hold`. A lease the page has to renew is a thing to try rather than
+/// a thing to open with: left alone it runs out after one ttl and the board opens
+/// half dark, which reads as a fault.
 async fn World::seed(self : World) -> Unit {
   @async.sleep(20)
   self.add(
@@ -272,7 +274,7 @@ async fn World::seed(self : World) -> Unit {
   self.add(
     "greeter",
     @moonsd.Endpoint::new("10.0.0.12", 12000, metadata=Map([("zone", "b")])),
-    "manual",
+    "held",
   )
   self.add(
     "checkout",
