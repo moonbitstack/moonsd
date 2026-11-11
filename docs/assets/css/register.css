@@ -121,10 +121,12 @@
   padding: 7px var(--s4);
   font-family: var(--font-mono); font-size: 12px;
   border-left: 2px solid transparent;
-  animation: row-in var(--t2) var(--ease) both;
 }
+/* a row is admitted once, when it arrives; a board that replays this on every poll
+   would read as a fault */
+.row[data-enter="true"] { animation: row-in var(--t2) var(--ease) both; }
 @keyframes row-in {
-  from { opacity: 0; transform: translateY(-4px); }
+  from { opacity: 0.35; transform: translateY(-3px); }
   to { opacity: 1; transform: none; }
 }
 .row[data-live="false"] { opacity: 0.42; }
@@ -137,7 +139,9 @@
 .bar { height: 3px; background: var(--board-cell); display: block; position: relative; overflow: hidden; }
 .bar i {
   position: absolute; inset: 0; background: var(--board-ink);
-  transform-origin: left center; transition: transform 240ms linear, background var(--t2) var(--ease);
+  transform-origin: left center;
+  transition: transform 240ms linear, background var(--t2) var(--ease);
+  will-change: transform;
 }
 .row .acts { display: flex; gap: 2px; justify-content: flex-end; }
 .row .act {
