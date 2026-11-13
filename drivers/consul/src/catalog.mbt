@@ -267,7 +267,7 @@ pub async fn Catalog::register(
   reg : CatalogRegistration,
   options~ : WriteOptions = default_write_options,
 ) -> WriteMeta raise Refused {
-  let body = @utf8.encode(catalog_registration_to_json(reg).stringify())
+  let body = @utf8.encode(@moonjson.dumps(catalog_registration_to_json(reg)))
   let (_, meta) = self.client.do_put("/v1/catalog/register", body, options, [])
   meta
 }
@@ -279,7 +279,7 @@ pub async fn Catalog::deregister(
   dereg : CatalogDeregistration,
   options~ : WriteOptions = default_write_options,
 ) -> WriteMeta raise Refused {
-  let body = @utf8.encode(catalog_dereg_to_json(dereg).stringify())
+  let body = @utf8.encode(@moonjson.dumps(catalog_dereg_to_json(dereg)))
   let (_, meta) = self.client.do_put("/v1/catalog/deregister", body, options, [])
   meta
 }

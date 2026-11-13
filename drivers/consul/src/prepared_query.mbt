@@ -207,7 +207,9 @@ pub async fn PreparedQuery::create(
   def : PreparedQueryDefinition,
   options~ : WriteOptions = default_write_options,
 ) -> (String, WriteMeta) raise Refused {
-  let body = @utf8.encode(prepared_query_definition_to_json(def).stringify())
+  let body = @utf8.encode(
+    @moonjson.dumps(prepared_query_definition_to_json(def)),
+  )
   let (json, meta) = self.client.do_post("/v1/query", body, options, [])
   (jstr(json_map(json), "ID"), meta)
 }
@@ -219,7 +221,9 @@ pub async fn PreparedQuery::update(
   def : PreparedQueryDefinition,
   options~ : WriteOptions = default_write_options,
 ) -> WriteMeta raise Refused {
-  let body = @utf8.encode(prepared_query_definition_to_json(def).stringify())
+  let body = @utf8.encode(
+    @moonjson.dumps(prepared_query_definition_to_json(def)),
+  )
   guard def.id is Some(id) else {
     raise Refused::Param("prepared query: updating needs an id")
   }

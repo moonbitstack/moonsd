@@ -39,7 +39,7 @@ pub async fn Connect::ca_set_config(
   config : CAConfig,
   options~ : WriteOptions = default_write_options,
 ) -> WriteMeta raise Refused {
-  let body = @utf8.encode(ca_config_to_json(config).stringify())
+  let body = @utf8.encode(@moonjson.dumps(ca_config_to_json(config)))
   let (_, meta) = self.client.do_put(
     "/v1/connect/ca/configuration",
     body,

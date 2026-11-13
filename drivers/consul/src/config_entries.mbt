@@ -495,7 +495,7 @@ pub async fn ConfigEntries::set(
   options~ : WriteOptions = default_write_options,
 ) -> WriteMeta raise Refused {
   let _ = config_entry_kind(entry)
-  let body = @utf8.encode(config_entry_to_json(entry).stringify())
+  let body = @utf8.encode(@moonjson.dumps(config_entry_to_json(entry)))
   let (_, meta) = self.client.do_put("/v1/config", body, options, [])
   meta
 }

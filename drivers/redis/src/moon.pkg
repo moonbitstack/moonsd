@@ -6,6 +6,7 @@
 // Protocol: https://redis.io/docs/reference/protocol-spec
 // Commands: https://redis.io/commands
 import {
+  "moonbitstack/moonjson",
   "moonbitstack/moonredis/resp",
   "moonbitstack/moontls/tls",
   "moonbitlang/core/double",

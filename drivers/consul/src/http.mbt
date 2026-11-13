@@ -156,8 +156,8 @@ async fn Client::do_request(
     json_null()
   } else {
     let text = @utf8.decode_lossy(resp.body[:])
-    @json.parse(text) catch {
-      e => raise Refused::Json(e.to_string())
+    @moonjson.loads(text, @moonjson.strict) catch {
+      e => raise Refused::Json(e.message())
     }
   }
   (resp, json)

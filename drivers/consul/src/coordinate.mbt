@@ -145,7 +145,7 @@ pub async fn Coordinate::update(
 ) -> WriteMeta raise Refused {
   let m = jobj()
   m["Coord"] = coordinate_value_to_json(coord)
-  let body = @utf8.encode(@json.to_json(m).stringify())
+  let body = @utf8.encode(@moonjson.dumps(@json.to_json(m)))
   let (_, meta) = self.client.do_put("/v1/coordinate/update", body, options, [])
   meta
 }

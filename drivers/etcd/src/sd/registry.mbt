@@ -51,7 +51,7 @@ pub impl @moonsd.Registrar for Registry with fn register(
 ) {
   let granted = self.client.lease().grant(seconds(ttl))
   let key = [..self.root(service), ..@utf8.encode(endpoint.id)]
-  let value = @utf8.encode(endpoint.to_json().stringify())
+  let value = @utf8.encode(@moonjson.dumps(endpoint.to_json()))
   ignore(self.client.kv().put(Bytes::from_array(key), value, lease=granted.id))
   { service, endpoint, ttl, token: granted.id.to_string(), }
 }
@@ -102,7 +102,9 @@ async fn Registry::look(
   let out : Array[@moonsd.Endpoint] = []
   for kv in answer.kvs {
     let text = @utf8.decode_lossy(kv.value)
-    let parsed = @json.parse(text) catch { _ => raise @moonsd.Malformed(text) }
+    let parsed = @moonjson.loads(text, @moonjson.strict) catch {
+      _ => raise @moonsd.Malformed(text)
+    }
     let endpoint : @moonsd.Endpoint = @json.from_json(parsed) catch {
       _ => raise @moonsd.Malformed(text)
     }

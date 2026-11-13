@@ -25,7 +25,9 @@ async fn main {
       client.json_set(
         "moonredis:example:doc",
         "$",
-        @json.parse("{\"title\":\"moon\",\"readings\":[1,2,3]}"),
+        @moonjson.loads(
+          "{\"title\":\"moon\",\"readings\":[1,2,3]}", @moonjson.strict,
+        ),
       ),
     )
     let title = client.json_get_text("moonredis:example:doc", path="$.title")

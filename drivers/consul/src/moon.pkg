@@ -3,6 +3,7 @@
 // https://github.com/hashicorp/consul/tree/main/api
 
 import {
+  "moonbitstack/moonjson",
   "moonbitlang/core/json",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/encoding/base64",

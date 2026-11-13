@@ -270,7 +270,7 @@ pub async fn Connect::intention_upsert(
       "intention_upsert: source_name and destination_name are required",
     )
   }
-  let body = @utf8.encode(intention_to_json(intention).stringify())
+  let body = @utf8.encode(@moonjson.dumps(intention_to_json(intention)))
   let (_, meta) = self.client.do_put(
     "/v1/connect/intentions/exact",
     body,

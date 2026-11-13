@@ -346,7 +346,9 @@ pub async fn Agent::service_register(
   reg : AgentServiceRegistration,
   options~ : WriteOptions = default_write_options,
 ) -> WriteMeta raise Refused {
-  let body = @utf8.encode(agent_service_registration_to_json(reg).stringify())
+  let body = @utf8.encode(
+    @moonjson.dumps(agent_service_registration_to_json(reg)),
+  )
   let (_, meta) = self.client.do_put(
     "/v1/agent/service/register",
     body,
@@ -382,7 +384,9 @@ pub async fn Agent::check_register(
   reg : AgentCheckRegistration,
   options~ : WriteOptions = default_write_options,
 ) -> WriteMeta raise Refused {
-  let body = @utf8.encode(agent_check_registration_to_json(reg).stringify())
+  let body = @utf8.encode(
+    @moonjson.dumps(agent_check_registration_to_json(reg)),
+  )
   let (_, meta) = self.client.do_put(
     "/v1/agent/check/register",
     body,
@@ -451,7 +455,7 @@ pub async fn Agent::check_update(
   let m = jobj()
   put_str(m, "Status", Some(update.status))
   put_str(m, "Output", update.output)
-  let body = @utf8.encode(@json.to_json(m).stringify())
+  let body = @utf8.encode(@moonjson.dumps(@json.to_json(m)))
   let (_, meta) = self.client.do_put(
     "/v1/agent/check/update/" + url_encode(update.check_id),
     body,
@@ -666,7 +670,7 @@ pub async fn Agent::update_acl_token(
 ) -> WriteMeta raise Refused {
   let m = jobj()
   put_str(m, "Token", Some(token))
-  let body = @utf8.encode(Json::object(m).stringify())
+  let body = @utf8.encode(@moonjson.dumps(Json::object(m)))
   let (_, meta) = self.client.do_put(
     "/v1/agent/token/acl_token",
     body,
@@ -713,7 +717,9 @@ pub async fn Agent::connect_authorize(
   params : AgentAuthorizeParams,
   options~ : WriteOptions = default_write_options,
 ) -> (AgentAuthorize, WriteMeta) raise Refused {
-  let body = @utf8.encode(agent_authorize_params_to_json(params).stringify())
+  let body = @utf8.encode(
+    @moonjson.dumps(agent_authorize_params_to_json(params)),
+  )
   let (json, meta) = self.client.do_post(
     "/v1/agent/connect/authorize",
     body,

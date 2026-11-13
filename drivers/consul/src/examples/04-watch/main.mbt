@@ -19,7 +19,7 @@ async fn main {
   @async.with_task_group(group => {
     group.spawn_bg(no_wait=true, () => {
       @concurrency.watch(client, Key(key), (index, value) => {
-        println("\{index}: \{value.stringify()}")
+        println("\{index}: \{@moonjson.dumps(value)}")
       })
     })
     for value in ["first", "second"] {

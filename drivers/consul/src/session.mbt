@@ -86,7 +86,7 @@ pub async fn Session::create(
   entry~ : SessionEntry = default_session_entry,
   options~ : WriteOptions = default_write_options,
 ) -> (SessionEntry, WriteMeta) raise Refused {
-  let body = @utf8.encode(session_entry_to_json(entry).stringify())
+  let body = @utf8.encode(@moonjson.dumps(session_entry_to_json(entry)))
   let (json, meta) = self.client.do_put("/v1/session/create", body, options, [])
   let m = json_map(json)
   ({ ..entry, id: jstr_opt(m, "ID"), }, meta)

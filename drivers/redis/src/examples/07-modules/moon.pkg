@@ -5,6 +5,7 @@ pkgtype(kind: "executable")
 supported_targets = "+native"
 
 import {
+  "moonbitstack/moonjson",
   "moonbitstack/moonredis",
   "moonbitstack/moonredis/socket",
   "moonbitlang/async",

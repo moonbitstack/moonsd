@@ -364,7 +364,7 @@ pub async fn ACL::token_create(
   token : ACLToken,
   options~ : WriteOptions = default_write_options,
 ) -> (ACLToken, WriteMeta) raise Refused {
-  let body = @utf8.encode(acl_token_to_json(token).stringify())
+  let body = @utf8.encode(@moonjson.dumps(acl_token_to_json(token)))
   let (json, meta) = self.client.do_put("/v1/acl/token", body, options, [])
   (acl_token_of(json), meta)
 }
@@ -376,7 +376,7 @@ pub async fn ACL::token_update(
   token : ACLToken,
   options~ : WriteOptions = default_write_options,
 ) -> (ACLToken, WriteMeta) raise Refused {
-  let body = @utf8.encode(acl_token_to_json(token).stringify())
+  let body = @utf8.encode(@moonjson.dumps(acl_token_to_json(token)))
   let (json, meta) = self.client.do_put(
     "/v1/acl/token/" + token_id(token),
     body,
@@ -458,7 +458,7 @@ pub async fn ACL::token_login(
   params : ACLLoginParams,
   options~ : WriteOptions = default_write_options,
 ) -> (ACLToken, WriteMeta) raise Refused {
-  let body = @utf8.encode(acl_login_params_to_json(params).stringify())
+  let body = @utf8.encode(@moonjson.dumps(acl_login_params_to_json(params)))
   let (json, meta) = self.client.do_post("/v1/acl/login", body, options, [])
   (acl_token_of(json), meta)
 }
@@ -480,7 +480,7 @@ pub async fn ACL::policy_create(
   policy : ACLPolicy,
   options~ : WriteOptions = default_write_options,
 ) -> (ACLPolicy, WriteMeta) raise Refused {
-  let body = @utf8.encode(acl_policy_to_json(policy).stringify())
+  let body = @utf8.encode(@moonjson.dumps(acl_policy_to_json(policy)))
   let (json, meta) = self.client.do_put("/v1/acl/policy", body, options, [])
   (acl_policy_of(json), meta)
 }
@@ -496,7 +496,7 @@ pub async fn ACL::policy_update(
     Some(i) => i
     None => raise Refused::Param("acl.policy_update: policy.id is required")
   }
-  let body = @utf8.encode(acl_policy_to_json(policy).stringify())
+  let body = @utf8.encode(@moonjson.dumps(acl_policy_to_json(policy)))
   let (json, meta) = self.client.do_put("/v1/acl/policy/" + id, body, options, [])
   (acl_policy_of(json), meta)
 }
@@ -547,7 +547,7 @@ pub async fn ACL::role_create(
   role : ACLRole,
   options~ : WriteOptions = default_write_options,
 ) -> (ACLRole, WriteMeta) raise Refused {
-  let body = @utf8.encode(acl_role_to_json(role).stringify())
+  let body = @utf8.encode(@moonjson.dumps(acl_role_to_json(role)))
   let (json, meta) = self.client.do_put("/v1/acl/role", body, options, [])
   (acl_role_of(json), meta)
 }
@@ -563,7 +563,7 @@ pub async fn ACL::role_update(
     Some(i) => i
     None => raise Refused::Param("acl.role_update: role.id is required")
   }
-  let body = @utf8.encode(acl_role_to_json(role).stringify())
+  let body = @utf8.encode(@moonjson.dumps(acl_role_to_json(role)))
   let (json, meta) = self.client.do_put("/v1/acl/role/" + id, body, options, [])
   (acl_role_of(json), meta)
 }
@@ -625,7 +625,7 @@ pub async fn ACL::auth_method_create(
   entry : ACLAuthMethod,
   options~ : WriteOptions = default_write_options,
 ) -> (ACLAuthMethod, WriteMeta) raise Refused {
-  let body = @utf8.encode(acl_auth_method_to_json(entry).stringify())
+  let body = @utf8.encode(@moonjson.dumps(acl_auth_method_to_json(entry)))
   let (json, meta) = self.client.do_put("/v1/acl/auth-method", body, options, [])
   (acl_auth_method_of(json), meta)
 }
@@ -641,7 +641,7 @@ pub async fn ACL::auth_method_update(
     Some(n) => n
     None => raise Refused::Param("acl.auth_method_update: name is required")
   }
-  let body = @utf8.encode(acl_auth_method_to_json(entry).stringify())
+  let body = @utf8.encode(@moonjson.dumps(acl_auth_method_to_json(entry)))
   let (json, meta) = self.client.do_put(
     "/v1/acl/auth-method/" + name,
     body,
@@ -705,7 +705,7 @@ pub async fn ACL::binding_rule_create(
   rule : ACLBindingRule,
   options~ : WriteOptions = default_write_options,
 ) -> (ACLBindingRule, WriteMeta) raise Refused {
-  let body = @utf8.encode(acl_binding_rule_to_json(rule).stringify())
+  let body = @utf8.encode(@moonjson.dumps(acl_binding_rule_to_json(rule)))
   let (json, meta) = self.client.do_put("/v1/acl/binding-rule", body, options, [])
   (acl_binding_rule_of(json), meta)
 }
@@ -721,7 +721,7 @@ pub async fn ACL::binding_rule_update(
     Some(i) => i
     None => raise Refused::Param("acl.binding_rule_update: id is required")
   }
-  let body = @utf8.encode(acl_binding_rule_to_json(rule).stringify())
+  let body = @utf8.encode(@moonjson.dumps(acl_binding_rule_to_json(rule)))
   let (json, meta) = self.client.do_put(
     "/v1/acl/binding-rule/" + id,
     body,

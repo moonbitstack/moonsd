@@ -53,6 +53,21 @@ async test "registering an id again replaces it, and the old lease is spent" {
 }
 
 ///|
+async test "a spent lease cannot renew an id someone else has registered" {
+  let registry = @memory.Registry::new()
+  let old = registry.register("s", @moonsd.Endpoint::new("h", 1, id="a"), 100)
+  let fresh = registry.register("s", @moonsd.Endpoint::new("h", 2, id="a"), 100)
+  let refused = try registry.renew(old) catch {
+    @moonsd.Refused::Expired(_) => true
+    _ => false
+  } noraise {
+    _ => false
+  }
+  assert_true(refused)
+  assert_eq(registry.resolve("s"), [fresh.endpoint])
+}
+
+///|
 async test "a snapshot brings back the services and the revision" {
   let registry = @memory.Registry::new()
   let kept = @moonsd.Endpoint::new(
@@ -70,6 +85,45 @@ async test "a snapshot brings back the services and the revision" {
   assert_eq(back.resolve("web"), [kept])
   assert_eq(back.revision(), registry.revision())
   for bad in ["", "[]", "{\"revision\":1}", "{\"revision\":1,\"services\":3}"] {
+    let refused = try @memory.Registry::restore(bad) catch {
+      @moonsd.Refused::Malformed(_) => true
+      _ => false
+    } noraise {
+      _ => false
+    }
+    assert_true(refused)
+  }
+}
+
+///|
+async test "an empty register writes a snapshot and comes back from it" {
+  let registry = @memory.Registry::new()
+  let text = registry.snapshot()
+  assert_eq(text, "{\"revision\":0,\"services\":{}}")
+  let back = @memory.Registry::restore(text)
+  assert_eq(back.services(), [])
+  assert_eq(back.revision(), 0L)
+}
+
+///|
+async test "a revision too large for a double keeps its digits across a snapshot" {
+  // One past 2^53, where the nearest double is a different number.
+  let registry = @memory.Registry::restore(
+    "{\"revision\":9007199254740993,\"services\":{}}",
+  )
+  assert_eq(registry.revision(), 9007199254740993L)
+  assert_true(registry.snapshot().contains("9007199254740993"))
+  let back = @memory.Registry::restore(registry.snapshot())
+  assert_eq(back.revision(), 9007199254740993L)
+}
+
+///|
+async test "a snapshot that is not one value, or whose revision is fractional, is refused" {
+  for
+    bad in [
+      "{\"revision\":1,\"services\":{}} {}", "{\"revision\":1.5,\"services\":{}}",
+      "{\"revision\":\"1\",\"services\":{}}", "{\"revision\":1,\"services\":null}",
+    ] {
     let refused = try @memory.Registry::restore(bad) catch {
       @moonsd.Refused::Malformed(_) => true
       _ => false

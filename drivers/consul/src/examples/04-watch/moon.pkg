@@ -3,6 +3,7 @@ pkgtype(kind: "executable")
 supported_targets = "+native"
 
 import {
+  "moonbitstack/moonjson",
   "moonbitstack/moonconsul",
   "moonbitstack/moonconsul/concurrency",
   "moonbitstack/moonconsul/fetch",

@@ -1,8 +1,10 @@
 // The contract implemented in this process, with leases, revisions and snapshots.
 import {
   "moonbitstack/moonsd",
+  "moonbitstack/moonjson",
   "moonbitlang/async/aqueue",
   "moonbitlang/core/json",
+  "moonbitlang/core/string",
 }
 
 import {

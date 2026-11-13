@@ -134,8 +134,8 @@ fn seats_of(value : Bytes, limit : Int32) -> Seats raise @moonconsul.Refused {
     return { limit, holders: Map([]), }
   }
   let text = @utf8.decode_lossy(value[:])
-  let json = @json.parse(text) catch {
-    e => raise @moonconsul.Json(e.to_string())
+  let json = @moonjson.loads(text, @moonjson.strict) catch {
+    e => raise @moonconsul.Json(e.message())
   }
   guard json is Object(fields) && fields.get("Limit") is Some(Number(n, ..)) else {
     raise @moonconsul.Json("not a semaphore: " + text)
@@ -159,7 +159,7 @@ fn Seats::encode(self : Seats) -> Bytes {
     ("Limit", Json(self.limit)),
     ("Holders", Json(holders)),
   ])
-  @utf8.encode(Json(fields).stringify())
+  @utf8.encode(@moonjson.dumps(Json(fields)))
 }
 
 ///|

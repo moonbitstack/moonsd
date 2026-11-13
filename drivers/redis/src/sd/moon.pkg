@@ -1,5 +1,6 @@
 // `moonsd` on Redis: endpoints as expiring keys.
 import {
+  "moonbitstack/moonjson",
   "moonbitstack/moonredis",
   "moonbitstack/moonsd",
   "moonbitlang/async",

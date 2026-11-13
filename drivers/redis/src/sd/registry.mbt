@@ -65,7 +65,7 @@ pub impl @moonsd.Registrar for Registry with fn register(
   ttl,
 ) {
   let token = self.key(service, endpoint.id)
-  let value = endpoint.to_json().stringify()
+  let value = @moonjson.dumps(endpoint.to_json())
   ignore(self.one(() => self.client.set(token, value, px=ttl.to_int64())))
   { service, endpoint, ttl, token, }
 }
@@ -128,7 +128,7 @@ async fn Registry::look(
     seen[key] = ()
     if self.one(() => self.client.get(key)) is Some(value) {
       let text = @utf8.decode_lossy(value)
-      let parsed = @json.parse(text) catch {
+      let parsed = @moonjson.loads(text, @moonjson.strict) catch {
         _ => raise @moonsd.Malformed(text)
       }
       let endpoint : @moonsd.Endpoint = @json.from_json(parsed) catch {

@@ -35,7 +35,7 @@ pub fn Fpha::text(self : Fpha) -> String {
 ///|
 /// Parse the JSON text a JSON command answers with.
 fn parse_json_text(text : String) -> @json.Json raise RedisError {
-  @json.parse(text[:]) catch {
+  @moonjson.loads(text[:], @moonjson.strict) catch {
     _ => raise Protocol("JSON reply is not valid JSON: " + text)
   }
 }
@@ -134,7 +134,7 @@ pub async fn Client::json_set(
     b"JSON.SET",
     arg_string(key),
     arg_string(path),
-    arg_string(value.stringify()),
+    arg_string(@moonjson.dumps(value)),
   ]
   if nx.unwrap_or(false) {
     args.push(b"NX")
@@ -161,7 +161,7 @@ pub async fn Client::json_mset(
   for (key, path, value) in triplets {
     args.push(arg_string(key))
     args.push(arg_string(path))
-    args.push(arg_string(value.stringify()))
+    args.push(arg_string(@moonjson.dumps(value)))
   }
   status_ok(self.command(args))
 }
@@ -180,7 +180,7 @@ pub async fn Client::json_merge(
       b"JSON.MERGE",
       arg_string(key),
       arg_string(path),
-      arg_string(value.stringify()),
+      arg_string(@moonjson.dumps(value)),
     ]),
   )
 }
@@ -352,7 +352,7 @@ pub async fn Client::json_strappend(
       b"JSON.STRAPPEND",
       arg_string(key),
       arg_string(path),
-      arg_string(@json.Json::string(value).stringify()),
+      arg_string(@moonjson.dumps(@json.Json::string(value))),
     ]),
   )
 }
@@ -396,7 +396,7 @@ pub async fn Client::json_arrindex(
     b"JSON.ARRINDEX",
     arg_string(key),
     arg_string(path),
-    arg_string(value.stringify()),
+    arg_string(@moonjson.dumps(value)),
   ]
   push_some(args, b"START", start.map(arg_int64))
   push_some(args, b"STOP", stop.map(arg_int64))
@@ -418,7 +418,7 @@ pub async fn Client::json_arrappend(
     arg_string(path),
   ]
   for value in values {
-    args.push(arg_string(value.stringify()))
+    args.push(arg_string(@moonjson.dumps(value)))
   }
   path_ints(self.command(args))
 }
@@ -440,7 +440,7 @@ pub async fn Client::json_arrinsert(
     arg_int64(index),
   ]
   for value in values {
-    args.push(arg_string(value.stringify()))
+    args.push(arg_string(@moonjson.dumps(value)))
   }
   path_ints(self.command(args))
 }

@@ -85,16 +85,20 @@ pub fn Registry::revision(self : Registry) -> Int64 {
 
 ///|
 /// Everything registered, as text `restore` reads.
+///
+/// The revision goes out as the digits it holds rather than as a double, so a register that
+/// has numbered more changes than a double carries still comes back with the number it had.
 pub fn Registry::snapshot(self : Registry) -> String {
   let services : Map[String, Array[@moonsd.Endpoint]] = Map([])
   for name in self.services() {
     services[name] = self.update(name).endpoints
   }
+  let revision = self.revision
   let doc : Json = {
-    "revision": Json(self.revision.to_double()),
+    "revision": Json::number(revision.to_double(), repr=revision.to_string()),
     "services": Json(services),
   }
-  doc.stringify()
+  @moonjson.dumps(doc)
 }
 
 ///|
@@ -104,19 +108,27 @@ pub fn Registry::restore(
   text : StringView,
   now? : () -> Int64,
 ) -> Registry raise @moonsd.Refused {
-  let doc = @json.parse(text) catch {
-    e => raise Malformed("not a snapshot: \{e}")
+  let doc = @moonjson.loads(text, @moonjson.strict) catch {
+    e => raise Malformed("not a snapshot: " + e.message())
   }
-  guard doc is Object(fields) &&
-    fields.get("revision") is Some(Number(revision, ..)) &&
-    fields.get("services") is Some(listed) else {
+  guard doc is Object(fields) else { raise Malformed("not a snapshot") }
+  let revision = match fields.get("revision") {
+    Some(Number(_, repr=Some(digits))) =>
+      @string.parse_int64(digits[:]) catch {
+        _ =>
+          raise Malformed("not a snapshot: the revision is not a whole number")
+      }
+    Some(Number(value, repr=None)) => value.to_int64()
+    _ => raise Malformed("not a snapshot")
+  }
+  guard fields.get("services") is Some(listed) else {
     raise Malformed("not a snapshot")
   }
   let services : Map[String, Array[@moonsd.Endpoint]] = @json.from_json(listed) catch {
     e => raise Malformed("not a snapshot: \{e}")
   }
   let out = Registry::new(now?)
-  out.revision = revision.to_int64()
+  out.revision = revision
   for name, endpoints in services {
     let held : Map[String, Held] = Map([])
     for endpoint in endpoints {

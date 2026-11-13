@@ -320,7 +320,7 @@ pub async fn KV::txn(
   }
   let wrapper : Map[String, Json] = Map([])
   wrapper["Txn"] = @json.to_json(op_array)
-  let body = @utf8.encode(@json.to_json(wrapper).stringify())
+  let body = @utf8.encode(@moonjson.dumps(@json.to_json(wrapper)))
   let (json, meta) = self.client.do_put_q(
     "/v1/txn",
     body,

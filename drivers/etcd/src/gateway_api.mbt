@@ -240,7 +240,7 @@ pub fn GatewayCall::encode_request(
   self : GatewayCall,
   body : Bytes,
 ) -> String raise EtcdError {
-  Json::stringify(message_json(self.request, body))
+  @moonjson.dumps(message_json(self.request, body))
 }
 
 ///|
@@ -252,7 +252,7 @@ pub fn GatewayCall::decode_reply(
   self : GatewayCall,
   text : StringView,
 ) -> Bytes raise EtcdError {
-  let json = @json.parse(text) catch {
+  let json = @moonjson.loads(text, @moonjson.strict) catch {
     _ => raise gateway_error(13, "gateway: the reply is not JSON")
   }
   match json {
@@ -281,7 +281,7 @@ pub fn GatewayCall::decode_reply(
 /// mapping applies as over gRPC; a body that is not a status (a proxy in the way,
 /// say) becomes `Refused` with what it did say.
 pub fn gateway_failure(text : StringView) -> EtcdError {
-  let json = @json.parse(text) catch {
+  let json = @moonjson.loads(text, @moonjson.strict) catch {
     _ =>
       return EtcdError::Refused(Status::{ code: 2, message: text.to_owned(), })
   }

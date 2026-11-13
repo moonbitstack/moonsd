@@ -1,5 +1,6 @@
 // `moonsd` on etcd: endpoints as keys on leases.
 import {
+  "moonbitstack/moonjson",
   "moonbitstack/moonetcd",
   "moonbitstack/moonetcd/client",
   "moonbitstack/moonsd",
