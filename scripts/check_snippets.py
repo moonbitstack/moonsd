@@ -133,7 +133,13 @@ def main():
                 continue
             code, spans = program(items)
             used = set(re.findall(r"@([a-z_][a-z0-9_]*)\.", code))
-            imports = sorted({aliases[a] for a in used if a in aliases} | {f"moonbitlang/core/{a}" for a in used if a not in aliases and a in CORE} | {f"moonbitlang/core/{NESTED[a]}" for a in used if a not in aliases and a in NESTED})
+            # A dependency may publish a package named `json` (or `utf8`), but a snippet's
+            # @json is core's Json: the alias a reader means is the language-level one.
+            imports = sorted(
+                {aliases[a] for a in used if a in aliases and a not in CORE and a not in NESTED}
+                | {f"moonbitlang/core/{a}" for a in used if a in CORE}
+                | {f"moonbitlang/core/{NESTED[a]}" for a in used if a in NESTED}
+            )
             if "async test" in code and "moonbitlang/async" not in imports:
                 imports.append("moonbitlang/async")
             pkg = src / "snippet_check"
