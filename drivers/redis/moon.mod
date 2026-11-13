@@ -45,8 +45,9 @@ description = "A Redis client for MoonBit: RESP2 and RESP3, pipelines, transacti
 source = "src"
 
 import {
+  "moonbitstack/moonjson@0.5.0",
   "moonbitstack/moonsd@0.1.2",
   "moonbitstack/moonnet@0.1.12",
-  "moonbitstack/moontls@0.9.16",
+  "moonbitstack/moontls@0.9.17",
   "moonbitlang/async@0.22.5",
 }

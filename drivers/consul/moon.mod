@@ -44,8 +44,9 @@ description = "A complete Consul client for MoonBit: agent, catalog, health, KV 
 source = "src"
 
 import {
+  "moonbitstack/moonjson@0.5.0",
   "moonbitlang/async@0.22.5",
-  "moonbitstack/moonfetch@0.1.7",
+  "moonbitstack/moonfetch@0.1.8",
   "moonbitstack/moonsd@0.1.2",
-  "moonbitstack/mooncrypt@0.4.14",
+  "moonbitstack/mooncrypt@0.5.0",
 }

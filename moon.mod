@@ -23,6 +23,10 @@ keywords = [
   "etcd",
   "consul",
   "conformance",
+  "json",
+  "snapshot",
+  "restore",
+  "revision",
   "in-memory",
   "async",
   "moonbit",
@@ -32,6 +36,7 @@ description = "Service discovery for MoonBit: the contract a registry implements
 
 import {
   "moonbitlang/async@0.22.5",
+  "moonbitstack/moonjson@0.5.0",
 }
 
 source = "src"
