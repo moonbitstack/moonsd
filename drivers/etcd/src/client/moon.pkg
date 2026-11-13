@@ -1,8 +1,8 @@
 // moonetcd/client: the native transports. One `Client` dials one or more etcd
-// endpoints over gRPC (multi-endpoint failover via the net ManagedChannel for unary
-// and server/client streaming, a multiplexed channel per bidi session so a stream can
-// reconnect from the last revision) or over etcd's HTTP/JSON gateway, and hands out
-// the same typed handles either way.
+// endpoints over gRPC (one connection per member, each call taking the next in turn,
+// and a multiplexed channel per bidi session so a stream can reconnect from the last
+// revision) or over etcd's HTTP/JSON gateway, and hands out the same typed handles
+// either way.
 //
 // Native only: the transports open real TCP connections.
 supported_targets = "native"
@@ -10,7 +10,6 @@ supported_targets = "native"
 import {
   "moonbitlang/core/buffer",
   "moonbitlang/core/encoding/utf8",
-  "moonbitlang/core/env",
   "moonbitlang/async",
   "moonbitstack/moonrpc/net",
   "moonbitstack/moonrpc/wire",

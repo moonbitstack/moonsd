@@ -51,9 +51,11 @@ async fn main {
 }
 ```
 
-A `Client` dials one or more endpoints. Unary and server/client-streaming calls go
-through a load-balanced channel that fails over across the endpoints; a Watch or a
-Lease KeepAlive opens its own multiplexed connection so it can reconnect on its own.
+A `Client` dials one or more endpoints. Unary and server-streaming calls each go to
+the next endpoint in turn, one connection per member, so a cluster carries the load and a
+member that has gone away costs one failed call before its connection is dropped. A Watch
+or a Lease KeepAlive opens a multiplexed connection of its own so it can reconnect on its
+own.
 
 The same program over etcd's HTTP/JSON gateway differs in one line:
 
@@ -83,7 +85,7 @@ curl -s -X POST http://127.0.0.1:2379/v3/kv/range -d '{"key":"L2dyZWV0aW5n"}'
 | One port | 2379 | 2379 |
 | Watch | one bidi stream per watch, resumed from the last revision | one streamed `POST` per watch, reissued from the last revision |
 | Keep-alive | one bidi stream, many ids | one `POST` per tick, answered once |
-| Failover | the channel balances; a stream moves to the next member | the next call dials the next member |
+| Failover | the next call takes the next member; a stream moves to the next member | the next call dials the next member |
 
 Pick the gateway when something in the path already speaks HTTP and not gRPC — a
 proxy, a language without an HTTP/2 client, a shell script. Both transports raise
@@ -127,10 +129,12 @@ gateway names no protocol at all — etcd's TLS listener offers `h2` alone, so a
 offers `http/1.1` is turned away (RFC 7301 §3.2) and one that offers nothing is served
 HTTP/1.1. Both of those are the library's business, not the caller's.
 
-`server_name` is what the member's certificate is judged against, on both transports; the
-handshake names the endpoint that was dialled, so a member reached by address and certified by
-name is verified by the name and dialled by the address. A certificate, an anchor or a key that
-does not parse is refused at `connect` with `UNAUTHENTICATED` rather than at the first call.
+`server_name` is the name the handshake offers as SNI and the name the member's certificate is
+checked against, on both transports; without one, the address dialled is the name. A member
+reached by address and certified by name is therefore dialled at its address and checked as
+itself, at every connection — the first one, and each reconnection after the member or the link
+went away. A certificate, an anchor or a key that does not parse is refused at `connect` with
+`UNAUTHENTICATED` rather than at the first call.
 
 A member started with `--client-cert-auth` reaches its own gateway through the server
 certificate, so that certificate needs to be valid for client authentication too, or the
@@ -293,10 +297,12 @@ to compaction or a future revision without scraping text.
 | `keep_alive_millis` | HTTP/2 keep-alive interval. |
 | `tls` | TLS settings: `enabled`, `ca_cert`, `cert`, `key`, `server_name`. |
 
-Multiple endpoints are load-balanced and failed over by the underlying channel. When a member
-dies under a call, a read goes again on the next member; a write answers `UNAVAILABLE`, since
-it may have run, and the next call goes to a member that is up. A Watch reconnects to the next
-endpoint and carries on from the revision after the last one it saw.
+Multiple endpoints take turns. The transport keeps one connection per member and sends each
+call to the next one, so the members share the calls and a member that is down is out of the
+rotation as soon as a call to it fails. When a member dies under a call, a read goes again on
+the next member; a write answers `UNAVAILABLE`, since it may have run, and the next call goes
+to a member that is up. A Watch reconnects to the next endpoint and carries on from the
+revision after the last one it saw.
 
 ## Examples
 

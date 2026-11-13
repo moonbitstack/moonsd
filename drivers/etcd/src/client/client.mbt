@@ -58,9 +58,11 @@ pub async fn Client::connect(
 ) -> Client raise EtcdError {
   let targets = config.endpoints.map(parse_endpoint)
   let tls = grpc_tls(config.tls)
-  let transport : &Transport = GrpcTransport::connect(targets, tls?) catch {
-    _ => raise transport_error("grpc connect")
-  }
+  let transport : &Transport = GrpcTransport::connect(
+    targets,
+    tls?,
+    name?=tls_name(config.tls),
+  )
   // Building the client is the authentication handshake, which reports its own failure
   // through the token the calls carry; anything else here is a setup that did not hold.
   Client::of_transport(config, transport) catch {
@@ -79,6 +81,7 @@ pub async fn Client::connect_gateway(
   let transport : &Transport = GatewayTransport::connect(
     targets,
     tls?=gateway_tls(config.tls),
+    name?=tls_name(config.tls),
   )
   Client::of_transport(config, transport) catch {
     _ => raise transport_error("client setup")

@@ -14,11 +14,13 @@ pub struct HttpConn {
 
 ///|
 /// Dial `host:port` and start an HTTP/1.1 client on it. With `tls` the socket is
-/// upgraded before the first request.
+/// upgraded before the first request; `name`, when given, is the SNI the handshake
+/// offers and the name the certificate is checked against.
 pub async fn HttpConn::open(
   host : String,
   port : Int32,
   tls? : @tls.Client,
+  name? : String,
 ) -> HttpConn raise EtcdError {
   let socket = @tcp.dial(host, port~) catch {
     _ => raise transport_error("gateway dial " + host + ":" + port.to_string())
@@ -26,9 +28,10 @@ pub async fn HttpConn::open(
   let socket = match tls {
     None => socket
     Some(client) => {
-      // The connection is named by the address it dials; what the certificate has to say
-      // is `server_name`, and that is the judge's business, not the handshake's.
-      let upgraded = socket.upgrade(client, host) catch {
+      // The member is reached by its address and named by its certificate, and the
+      // handshake is where both are put together: without a name of its own the
+      // connection answers to the address dialled.
+      let upgraded = socket.upgrade(client, name.unwrap_or(host)) catch {
         _ => {
           socket.close()
           raise transport_error(

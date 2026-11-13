@@ -117,6 +117,35 @@ async test "tls: server_name verifies a member reached by address" {
 }
 
 ///|
+async test "tls: a connection dialled again is still checked by the name, not the address" {
+  @async.with_task_group <| g => {
+    // The certificate names `localhost` alone. A second connection that went back to
+    // checking the address dialled would be refused, so an answer proves the name
+    // travels with every dial rather than with the first one only.
+    let (server, serving) = tls_grpc_server(named_cert)
+    let running = g.spawn(() => server.serve(port=0, tls=serving))
+    let port = bound_port(server)
+    let config = secure_config(port, root, server_name="localhost")
+    let transport = GrpcTransport::connect(
+      [("127.0.0.1", port)],
+      tls?=grpc_tls(config.tls),
+      name="localhost",
+    )
+    let body = @moonetcd.RangeRequest::{
+      ..@moonetcd.RangeRequest::empty(),
+      key: b"secure/key",
+    }.encode()
+    let first = Transport::unary(transport, "/etcdserverpb.KV/Range", body, metadata=[])
+    transport.forget("127.0.0.1:" + port.to_string())
+    let second = Transport::unary(transport, "/etcdserverpb.KV/Range", body, metadata=[])
+    assert_eq(first, second)
+    assert_eq(@moonetcd.RangeResponse::decode(second).kvs[0].value, b"secure")
+    Transport::close(transport)
+    running.cancel()
+  }
+}
+
+///|
 async test "tls: a member whose certificate another CA signed is refused" {
   @async.with_task_group <| g => {
     let (server, serving) = tls_grpc_server(server_cert)

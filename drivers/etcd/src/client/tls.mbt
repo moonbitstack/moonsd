@@ -56,22 +56,22 @@ fn tls_error(message : String) -> EtcdError {
 }
 
 ///|
-/// Judge the server's chain against the roots, by the name the caller configured rather
-/// than the address that was dialled. The handshake hands a judge the host it dialled,
-/// so a member reached by address and named by a certificate is verified here.
-fn naming_judge(roots : @x509.Roots, name : String) -> @tls.Verify {
-  @tls.Custom((chain, _host) => {
-    let _ = @x509.verify(
-      chain[:],
-      roots,
-      now=(@env.now() / 1000).reinterpret_as_int64(),
-      host=name,
-    )
-  })
+/// The name a member's certificate has to carry, when the caller configured one: the
+/// handshake offers it as SNI and checks the chain against it. Without one the address
+/// dialled is the name, which is what a certificate that names addresses answers to.
+fn tls_name(tls_config : @moonetcd.TlsConfig) -> String? {
+  if tls_config.enabled && tls_config.server_name != "" {
+    Some(tls_config.server_name)
+  } else {
+    None
+  }
 }
 
 ///|
-/// Build the TLS client both transports dial with: `None` when TLS is switched off.
+/// Build the TLS client both transports dial with: `None` when TLS is switched off. The
+/// trust anchors and the client certificate are all it carries; which name the chain is
+/// checked against is the dial's business, so a member reached by address and certified
+/// by name is verified by the name at every connection, the first one and any later one.
 fn tls_client(
   tls_config : @moonetcd.TlsConfig,
   alpn~ : Array[String],
@@ -81,24 +81,13 @@ fn tls_client(
   if (tls_config.cert.length() > 0) != (tls_config.key.length() > 0) {
     raise tls_error("a client certificate and its key go together")
   }
-  let verify = if tls_config.server_name == "" {
-    @tls.Chain
-  } else {
-    naming_judge(roots, tls_config.server_name)
-  }
   let cert_key = if tls_config.key.length() > 0 {
     Some(tls_key(tls_config.key))
   } else {
     None
   }
   Some(
-    @tls.Client::new(
-      roots,
-      alpn~,
-      verify~,
-      cert=tls_chain(tls_config.cert),
-      cert_key?,
-    ),
+    @tls.Client::new(roots, alpn~, cert=tls_chain(tls_config.cert), cert_key?),
   )
 }
 

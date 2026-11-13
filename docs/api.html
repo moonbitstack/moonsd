@@ -170,7 +170,7 @@
 <div class="entry" data-name="registry::restore fn"><pre class="sig">pub fn Registry::restore(StringView, now? : () -&gt; Int64) -&gt; Self raise @moonsd.Refused</pre><div class="doc"><p>A registry holding what <code class="inline">snapshot</code> wrote. Restored entries have no lease to renew and do not expire: whoever registered them registers again.</p></div></div>
 <div class="entry" data-name="registry::revision fn"><pre class="sig">pub fn Registry::revision(Self) -&gt; Int64</pre><div class="doc"><p>The revision, which grows with every change.</p></div></div>
 <div class="entry" data-name="registry::services fn"><pre class="sig">pub fn Registry::services(Self) -&gt; Array[String]</pre><div class="doc"><p>The services that have an endpoint.</p></div></div>
-<div class="entry" data-name="registry::snapshot fn"><pre class="sig">pub fn Registry::snapshot(Self) -&gt; String</pre><div class="doc"><p>Everything registered, as text <code class="inline">restore</code> reads.</p></div></div>
+<div class="entry" data-name="registry::snapshot fn"><pre class="sig">pub fn Registry::snapshot(Self) -&gt; String</pre><div class="doc"><p>Everything registered, as text <code class="inline">restore</code> reads.</p><p>The revision goes out as the digits it holds rather than as a double, so a register that has numbered more changes than a double carries still comes back with the number it had.</p></div></div>
 <div class="entry" data-name="registry::sweep fn"><pre class="sig">pub fn Registry::sweep(Self) -&gt; Unit</pre><div class="doc"><p>Drop every lease past its time.</p></div></div>
 <div class="entry" data-name="registry::watch fn"><pre class="sig">pub async fn Registry::watch(Self, String) -&gt; &amp;@moonsd.Watcher</pre></div>
 <div class="pkg__group">Implementations <span class="n">2</span></div>
@@ -2255,6 +2255,7 @@
   mut next_endpoint : Int32
   mutex : @async.Mutex
   tls : @tls.Client?
+  name : String?
 }</pre><div class="doc"><p>etcd over its HTTP/JSON gateway. Built by <code class="inline">Client::connect_gateway</code>.</p><p>A unary call keeps its connection for the next one; the pool is what makes a client shared by many tasks cheap. A stream owns its connection until it ends, because the gateway streams one call per request — there is no duplex to multiplex on.</p></div></div>
 <div class="entry" data-name="gatewaywatchstream struct"><pre class="sig">pub struct GatewayWatchStream {
   transport : GatewayTransport
@@ -2272,10 +2273,12 @@
   bidi : @net.BidiStream
 }</pre><div class="doc"><p>One keep-alive session over gRPC: a bidi stream on its own connection, so it never disturbs the unary path.</p></div></div>
 <div class="entry" data-name="grpctransport struct"><pre class="sig">pub struct GrpcTransport {
-  channel : @net.ManagedChannel
   targets : Array[(String, Int32)]
   tls : @tls.Client?
-}</pre><div class="doc"><p>etcd over gRPC. Built by <code class="inline">Client::connect</code>.</p></div></div>
+  name : String?
+  channels : Map[String, @net.Channel]
+  mut next : Int32
+}</pre><div class="doc"><p>etcd over gRPC. Built by <code class="inline">Client::connect</code>.</p><p><code class="inline">name</code> is what a certificate has to carry, and what the handshake offers as SNI: a member reached by address and certified by name is dialled by its address and checked against its name, at every dial including a reconnection.</p></div></div>
 <div class="entry" data-name="grpcwatchstream struct"><pre class="sig">pub struct GrpcWatchStream {
   transport : GrpcTransport
   group : @async.TaskGroup[Unit]
@@ -2376,12 +2379,12 @@
 <div class="entry" data-name="election::resign fn"><pre class="sig">pub async fn Election::resign(Self, @moonetcd.LeaderKey) -&gt; @moonetcd.ResignResponse raise @moonetcd.EtcdError</pre><div class="doc"><p>Resign the leadership identified by <code class="inline">leader</code>.</p></div></div>
 <div class="entry" data-name="gateway_tls fn"><pre class="sig">pub fn gateway_tls(@moonetcd.TlsConfig) -&gt; @tls.Client? raise @moonetcd.EtcdError</pre><div class="doc"><p>The TLS setup for the gateway port: no protocol in ALPN, which is what leaves etcd serving HTTP/1.1 rather than the HTTP/2 it offers. <code class="inline">None</code> when TLS is switched off.</p></div></div>
 <div class="entry" data-name="grpc_tls fn"><pre class="sig">pub fn grpc_tls(@moonetcd.TlsConfig) -&gt; @tls.Client? raise @moonetcd.EtcdError</pre><div class="doc"><p>The TLS setup for the gRPC port: HTTP/2, so the client names <code class="inline">h2</code> and nothing else. <code class="inline">None</code> when the configuration has TLS switched off.</p></div></div>
-<div class="entry" data-name="grpctransport::connect fn"><pre class="sig">pub async fn GrpcTransport::connect(Array[(String, Int32)], tls? : @tls.Client) -&gt; Self</pre><div class="doc"><p>Dial the endpoints. Nothing is sent until the first call.</p></div></div>
+<div class="entry" data-name="grpctransport::connect fn"><pre class="sig">pub fn GrpcTransport::connect(Array[(String, Int32)], tls? : @tls.Client, name? : String) -&gt; Self</pre><div class="doc"><p>Dial the endpoints. Nothing is sent until the first call, and a member that is not up yet is dialled when a call first reaches it.</p></div></div>
 <div class="entry" data-name="httpconn::body fn"><pre class="sig">pub async fn HttpConn::body(Self) -&gt; Bytes raise @moonetcd.EtcdError</pre><div class="doc"><p>The rest of the body, up to the end of the message.</p></div></div>
 <div class="entry" data-name="httpconn::close fn"><pre class="sig">pub fn HttpConn::close(Self) -&gt; Unit</pre><div class="doc"><p>Drop the connection. A stream holds its own, so this is how a watch a caller has lost interest in is cancelled: the gateway cancels the watch when the request ends.</p></div></div>
 <div class="entry" data-name="httpconn::is_reusable fn"><pre class="sig">pub fn HttpConn::is_reusable(Self) -&gt; Bool</pre><div class="doc"><p>Whether the connection can carry another request.</p></div></div>
 <div class="entry" data-name="httpconn::next_event fn"><pre class="sig">pub async fn HttpConn::next_event(Self) -&gt; @http1.Event raise @moonetcd.EtcdError</pre><div class="doc"><p>The next event the peer sends, with more octets read from the socket whenever the state machine asks for them. <code class="inline">Closed</code> means the peer hung up.</p></div></div>
-<div class="entry" data-name="httpconn::open fn"><pre class="sig">pub async fn HttpConn::open(String, Int32, tls? : @tls.Client) -&gt; Self raise @moonetcd.EtcdError</pre><div class="doc"><p>Dial <code class="inline">host:port</code> and start an HTTP/1.1 client on it. With <code class="inline">tls</code> the socket is upgraded before the first request.</p></div></div>
+<div class="entry" data-name="httpconn::open fn"><pre class="sig">pub async fn HttpConn::open(String, Int32, tls? : @tls.Client, name? : String) -&gt; Self raise @moonetcd.EtcdError</pre><div class="doc"><p>Dial <code class="inline">host:port</code> and start an HTTP/1.1 client on it. With <code class="inline">tls</code> the socket is upgraded before the first request; <code class="inline">name</code>, when given, is the SNI the handshake offers and the name the certificate is checked against.</p></div></div>
 <div class="entry" data-name="httpconn::post fn"><pre class="sig">pub async fn HttpConn::post(Self, String, Bytes, Array[@header.Header]) -&gt; Unit raise @moonetcd.EtcdError</pre><div class="doc"><p>Post <code class="inline">body</code> to <code class="inline">path</code>, with the gateway's headers plus whatever metadata the call carries. The gateway reads the auth token from <code class="inline">Authorization</code>, which is where the <code class="inline">token</code> metadata goes.</p></div></div>
 <div class="entry" data-name="httpconn::ready fn"><pre class="sig">pub fn HttpConn::ready(Self) -&gt; Unit raise @moonetcd.EtcdError</pre><div class="doc"><p>Begin the next exchange on a kept-alive connection.</p></div></div>
 <div class="entry" data-name="httpconn::response_head fn"><pre class="sig">pub async fn HttpConn::response_head(Self) -&gt; @http1.Response raise @moonetcd.EtcdError</pre><div class="doc"><p>The status line and headers of the reply, as soon as they have arrived.</p></div></div>
