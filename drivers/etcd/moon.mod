@@ -1,6 +1,6 @@
 name = "moonbitstack/moonetcd"
 
-version = "0.1.4"
+version = "0.2.0"
 
 readme = "README.md"
 
@@ -47,10 +47,10 @@ description = "An etcd v3 client for MoonBit."
 
 import {
   "moonbitstack/moonjson@0.5.0",
-  "moonbitstack/moonsd@0.1.2",
-  "moonbitstack/moonrpc@0.22.0",
+  "moonbitstack/moonsd@0.2.0",
+  "moonbitstack/moonrpc@0.22.1",
   "moonbitstack/moonhttp@0.16.0",
-  "moonbitstack/moonnet@0.1.12",
+  "moonbitstack/moonnet@0.2.0",
   "moonbitstack/moonbase@0.5.0",
   "moonbitstack/mooncred@0.7.0",
   "moonbitstack/moontls@0.9.17",

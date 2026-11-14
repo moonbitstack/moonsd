@@ -1,6 +1,6 @@
 name = "moonbitstack/moonconsul"
 
-version = "0.1.4"
+version = "0.2.0"
 
 readme = "README.md"
 
@@ -46,7 +46,7 @@ source = "src"
 import {
   "moonbitstack/moonjson@0.5.0",
   "moonbitlang/async@0.22.5",
-  "moonbitstack/moonfetch@0.1.8",
-  "moonbitstack/moonsd@0.1.2",
+  "moonbitstack/moonfetch@0.2.0",
+  "moonbitstack/moonsd@0.2.0",
   "moonbitstack/mooncrypt@0.5.0",
 }
