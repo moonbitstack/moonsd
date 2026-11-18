@@ -7,3 +7,6 @@ target/
 # The clients under drivers/ are modules of their own and publish from there.
 drivers/
 moon.work
+
+# Examples are read in the repository and run in CI; they do not ship.
+src/examples/
