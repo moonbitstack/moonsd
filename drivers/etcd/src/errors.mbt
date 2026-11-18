@@ -80,7 +80,7 @@ fn extract_rev(message : String) -> Int64 {
   let mut value : Int64 = 0L
   let mut k = start + 1
   while k < end {
-    value = value * 10L + Int64::from_int(chars[k].to_int() - 48)
+    value = value * 10L + (chars[k].to_int() - 48).to_int64()
     k = k + 1
   }
   value
