@@ -1,6 +1,6 @@
 name = "moonbitstack/moonsd"
 
-version = "0.2.0"
+version = "0.2.1"
 
 readme = "README.md"
 
@@ -36,7 +36,7 @@ description = "Service discovery for MoonBit: the contract a registry implements
 
 import {
   "moonbitlang/async@0.22.5",
-  "moonbitstack/moonjson@0.5.0",
+  "moonbitstack/moonjson@0.5.1",
 }
 
 source = "src"

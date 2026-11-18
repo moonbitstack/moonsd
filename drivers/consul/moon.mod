@@ -1,6 +1,6 @@
 name = "moonbitstack/moonconsul"
 
-version = "0.2.0"
+version = "0.2.1"
 
 readme = "README.md"
 
@@ -44,9 +44,9 @@ description = "A complete Consul client for MoonBit: agent, catalog, health, KV 
 source = "src"
 
 import {
-  "moonbitstack/moonjson@0.5.0",
+  "moonbitstack/moonjson@0.5.1",
   "moonbitlang/async@0.22.5",
-  "moonbitstack/moonfetch@0.2.0",
-  "moonbitstack/moonsd@0.2.0",
-  "moonbitstack/mooncrypt@0.5.0",
+  "moonbitstack/moonfetch@0.2.1",
+  "moonbitstack/moonsd@0.2.1",
+  "moonbitstack/mooncrypt@0.5.2",
 }
